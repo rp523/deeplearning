@@ -1,0 +1,6 @@
+.project
+.pydevproject
+.settings/
+test.py
+__pycache__
+*.pyc
