@@ -11,7 +11,10 @@ class Storage:
             self.__location = "notebook"
         elif pcname == "floydhub":
             self.__location = "floydhub"
+        elif pcname == "Yusuke-PC":
+            self.__location = "desktop"
         else:
+            print(pcname)
             assert(0)
     
     def dataset_path(self, dataset_name):
@@ -21,6 +24,8 @@ class Storage:
                 ret_path = "/media/isgsktyktt/EC-PHU3/cityscapes"
             elif self.__location == "floydhub":
                 ret_path = "/floyd/input/cityscapes"
+            elif self.__location == "desktop":
+                ret_path = r"G:\dataset\cityscapes"
         else:
             assert(0)
         assert(os.path.exists(ret_path))

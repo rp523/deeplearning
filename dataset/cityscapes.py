@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 import storage
 from common import fileio
-from dataset_base import *
+from dataset_base import label_dict
 
 class CityScapes:
     def __init__(self):
