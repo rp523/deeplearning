@@ -30,7 +30,9 @@ def get_file_list(tgt_dir, find_txt = None, tgt_ext = None, recursive = True):
         elif os.path.isdir(item_path):
             if recursive:
                 ret = ret + get_file_list(tgt_dir = item_path,
-                                          tgt_ext = tgt_ext)
+                                          find_txt = find_txt,
+                                          tgt_ext = tgt_ext,
+                                          recursive = recursive)
     return ret
 
 if __name__ == "__main__":
