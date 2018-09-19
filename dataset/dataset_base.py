@@ -50,6 +50,7 @@ label_dict["bicyclegroup" ] = label_dict["bicycle"] + 128
 label_dict["persongroup"  ] = label_dict["person" ] + 128
 label_dict["pole group"   ] = label_dict["pole"   ] + 128
 label_dict["ridergroup"   ] = label_dict["rider"  ] + 128
+label_dict["traingroup"   ] = label_dict["train"  ] + 128
 #zeros
 label_dict["out of roi"] = 0
 label_dict["rectification border"] = 0
