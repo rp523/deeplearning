@@ -55,3 +55,4 @@ label_dict["traingroup"   ] = label_dict["train"  ] + 128
 label_dict["out of roi"] = 0
 label_dict["rectification border"] = 0
 label_dict["ego vehicle"  ] = 0
+label_dict["license plate"] = 0
