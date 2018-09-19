@@ -21,15 +21,16 @@ class Storage:
         # 実行環境ごとに異なるデータセットのパスを取得する
         if dataset_name == "cityscapes":
             if self.__location == "notebook":
-                ret_path = "/media/isgsktyktt/EC-PHU3/cityscapes"
+                base_path = "/media/isgsktyktt/EC-PHU3"
             elif self.__location == "floydhub":
-                ret_path = "/floyd/input/cityscapes"
+                base_path = "/floyd/input"
             elif self.__location == "desktop":
-                ret_path = r"G:\dataset\cityscapes"
+                base_path = r"G:\dataset"
         else:
             assert(0)
-        assert(os.path.exists(ret_path))
-        return ret_path
+        dataset_path = os.path.join(base_path, dataset_name)
+        assert(os.path.exists(dataset_path))
+        return dataset_path
     
 if __name__ == "__main__":
     s = Storage()
