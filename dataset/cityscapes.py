@@ -16,24 +16,27 @@ class CityScapes:
         self.__img_path_list, self.__json_path_list = self.__update_list(data_path)
         
     def __update_list(self, data_path):
-        json_path_list = fileio.get_file_list(tgt_dir = data_path,
+        json_path_list_ = fileio.get_file_list(tgt_dir = data_path,
                                               tgt_ext = ".json")
         img_path_list_  = fileio.get_file_list(tgt_dir = data_path,
                                               tgt_ext = ".png",
                                               find_txt = "leftImg8bit.png")
         json_key_list = []
-        for json_path in json_path_list:
+        for json_path in json_path_list_:
             json_name = fileio.get_file_name(json_path)
             json_key_list.append(re.search("\D+\d+_\d+", json_name).group())
         img_key_list = []
         for img_path in img_path_list_:
             img_name = fileio.get_file_name(img_path)
             img_key_list.append(re.search("\D+\d+_\d+", img_name).group())
+
         img_path_list = []
+        json_path_list = []
         for json_key in json_key_list:
-            idx = img_key_list.index(json_key)
-            new_path = img_path_list_[idx]
-            img_path_list.append(new_path)
+            if json_key in img_key_list:
+                idx = img_key_list.index(json_key)
+                img_path_list.append(img_path_list_[idx])
+                json_path_list.append(json_path_list_[idx])
 
         return img_path_list, json_path_list
     
@@ -42,11 +45,12 @@ class CityScapes:
             index = np.random.randint(len(self.__json_path_list))
         
         img_path = self.__img_path_list[index]
-        print(img_path)
         rgb_img = Image.open(img_path)
         rgb_map = np.asarray(rgb_img)
         
         json_path = self.__json_path_list[index]
+        print(img_path)
+        print(json_path)
         info = json.load(open(json_path))
         h = info["imgHeight"]
         w = info["imgWidth"]
@@ -84,9 +88,9 @@ class CityScapes:
                 y1 = min(y1, h - 1)
                 rects = np.append(rects, np.array([x0 / w, y0 / h, x1 / w, y1 / h]).reshape(1, 4), axis = 0)
         if 1: #debug view
-            
-            draw = ImageDraw.Draw(pixel_img)
-            dw, dh = pixel_img.size
+            rgb_img = rgb_img.resize((rgb_img.size[0]//2, rgb_img.size[1]//2))
+            draw = ImageDraw.Draw(rgb_img)
+            dw, dh = rgb_img.size
             for i in range(rects.shape[0]):
                 rect = rects[i]
                 x0 = int(rect[0] * dw)
@@ -101,8 +105,7 @@ class CityScapes:
                                   k,
                                   fill = 255)
                         break
-            pixel_img.resize((pixel_img.size[0]//2,pixel_img.size[1]//2)).show()
-            rgb_img.resize((rgb_img.size[0]//2,rgb_img.size[1]//2)).show()
+            rgb_img.show()
             exit()
 
         return rgb_map, labels, rects, pixel_label_map
