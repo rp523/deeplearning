@@ -14,7 +14,7 @@ class CityScapes:
         s = storage.Storage()
         data_path = s.dataset_path("cityscapes")
         self.__img_path_list, self.__json_path_list = self.__update_list(data_path)
-        self.__debug = True
+        self.__debug = False
         
     def __update_list(self, data_path):
         json_path_list_ = fileio.get_file_list(tgt_dir = os.path.join(data_path, "gtFine_trainvaltest"), # Fineだけ,
@@ -130,5 +130,5 @@ class CityScapes:
         
 if __name__ == "__main__":
     c = CityScapes()
-    (c.get_one_data(["car", "truck", "bus", "trailer", "bicycle", "person", "rider"]))
+    print(c.get_one_data(["car", "truck", "bus", "trailer", "bicycle", "person", "rider"]))
     
