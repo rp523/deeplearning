@@ -10,7 +10,10 @@ def get_ext(file_path):
         # READMEなど
         return ""
 
-def get_file_list(tgt_dir, tgt_ext = None, recursive = True):
+def get_file_name(file_path):
+    return file_path[file_path.rfind(os.sep) + 1:]
+
+def get_file_list(tgt_dir, find_txt = None, tgt_ext = None, recursive = True):
     # 着目しているディレクトリ以下のファイルを全取得する
     ret = []
     for item_name in os.listdir(tgt_dir):
@@ -18,6 +21,10 @@ def get_file_list(tgt_dir, tgt_ext = None, recursive = True):
         if os.path.isfile(item_path):
             if tgt_ext is not None:
                 if get_ext(item_path) != tgt_ext:
+                    continue
+            if not find_txt is None:
+                file_name = get_file_name(item_path)
+                if file_name.find(find_txt) < 0:
                     continue
             ret.append(item_path)
         elif os.path.isdir(item_path):
