@@ -19,13 +19,12 @@ class Storage:
     
     def dataset_path(self, dataset_name):
         # 実行環境ごとに異なるデータセットのパスを取得する
-        if dataset_name == "cityscapes":
-            if self.__location == "notebook":
-                base_path = "/media/isgsktyktt/EC-PHU3"
-            elif self.__location == "floydhub":
-                base_path = "/floyd/input"
-            elif self.__location == "desktop":
-                base_path = r"G:\dataset"
+        if self.__location == "notebook":
+            base_path = "/media/isgsktyktt/EC-PHU3"
+        elif self.__location == "floydhub":
+            base_path = "/floyd/input"
+        elif self.__location == "desktop":
+            base_path = r"G:\dataset"
         else:
             assert(0)
         dataset_path = os.path.join(base_path, dataset_name)
