@@ -1,14 +1,13 @@
 #coding:utf-8
-import sys, os, shutil
+import sys, os
 import numpy as np
 import json
 from PIL import Image, ImageDraw, ImageFont
-import re
 
 sys.path.append("../")
 import storage
 from common import fileio
-from dataset_base import *
+from .dataset_base import *
 
 class BDD100k:
     def __init__(self):
@@ -142,7 +141,6 @@ class BDD100k:
 
         info = json.load(open(json_path))
         obj_list = info["labels"]
-        obj_num = len(obj_list)
         
         rect_labels = np.empty(0).astype(np.int)
         rects = np.empty((0, 4)).astype(np.float)
@@ -233,7 +231,6 @@ class BDD100k:
                 print(bdd)
                 
     def split_json(self):
-        import re
         for data_type in ["val", "train"]:
             dst_dir = os.path.join(self.__data_path, "labels", data_type)
             if not os.path.exists(dst_dir):
@@ -288,8 +285,8 @@ def make_vertices_summary_img(data_type):
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 if __name__ == "__main__":
-    make_vertices_summary_img("val")
-    make_vertices_summary_img("train")
     make_area_summary_img("train")
     make_area_summary_img("val")
+    make_vertices_summary_img("train")
+    make_vertices_summary_img("val")
     print("Done.")

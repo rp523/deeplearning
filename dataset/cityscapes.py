@@ -1,13 +1,12 @@
 #coding:utf-8
-import sys, os, shutil
+import os
 import numpy as np
 import json
 from PIL import Image, ImageDraw, ImageFont
-import re
 
 import storage
 from common import fileio
-from dataset_base import label_dict
+from .dataset_base import label_dict
 
 class CityScapes:
     def __init__(self):
@@ -75,7 +74,7 @@ class CityScapes:
         pixel_label_map = np.asarray(pixel_img)
         draw = ImageDraw.Draw(pixel_img)
         
-        for o in range(len(obj_list)):
+        for o in range(obj_num):
             obj = obj_list[o]
             label_name   = obj["label"]
             if not (label_name in label_dict.keys()):
