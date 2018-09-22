@@ -41,6 +41,8 @@ label_dict["sky"          ] = len(label_dict.keys()) + 1
 label_dict["ground"       ] = len(label_dict.keys()) + 1
 label_dict["dynamic"      ] = len(label_dict.keys()) + 1
 label_dict["static"       ] = len(label_dict.keys()) + 1
+label_dict["lane"         ] = len(label_dict.keys()) + 1
+label_dict["drivable area"] = len(label_dict.keys()) + 1
 
 # groups
 label_dict["cargroup"     ] = label_dict["car"    ] + 128
@@ -56,3 +58,6 @@ label_dict["out of roi"] = 0
 label_dict["rectification border"] = 0
 label_dict["ego vehicle"  ] = 0
 label_dict["license plate"] = 0
+# same value
+label_dict["bike"] = label_dict["motorcycle"]
+label_dict["motor"] = label_dict["motorcycle"]
