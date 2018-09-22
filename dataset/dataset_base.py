@@ -61,3 +61,7 @@ label_dict["license plate"] = 0
 # same value
 label_dict["bike"] = label_dict["motorcycle"]
 label_dict["motor"] = label_dict["motorcycle"]
+
+area_dict = {}
+area_dict["driving lane"] = len(area_dict.keys()) + 1
+area_dict["beyond line"] = len(area_dict.keys()) + 1
