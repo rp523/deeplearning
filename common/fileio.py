@@ -17,7 +17,9 @@ def get_file_list(tgt_dir,
                   name_txt = None,
                   include_path_txt = None,
                   exclude_path_txt = None,
-                  tgt_ext = None, recursive = True):
+                  tgt_ext = None,
+                  only_name = None,
+                  recursive = True):
     # 着目しているディレクトリ以下のファイルを全取得する
     ret = []
     for item_name in os.listdir(tgt_dir):
@@ -36,7 +38,10 @@ def get_file_list(tgt_dir,
             if not exclude_path_txt is None:
                 if item_path.find(exclude_path_txt) >= 0:
                     continue
-            ret.append(item_path)
+            add = item_path
+            if only_name is True:
+                add = get_file_name(add)
+            ret.append(add)
         elif os.path.isdir(item_path):
             if recursive:
                 ret = ret + get_file_list(tgt_dir = item_path,
@@ -44,6 +49,7 @@ def get_file_list(tgt_dir,
                                           include_path_txt = include_path_txt,
                                           exclude_path_txt = exclude_path_txt,
                                           tgt_ext = tgt_ext,
+                                          only_name = only_name,
                                           recursive = recursive)
     return ret
 
