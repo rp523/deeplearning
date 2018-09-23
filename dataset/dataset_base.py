@@ -31,6 +31,7 @@ label_dict["tunnel"       ] = len(label_dict.keys()) + 1
 label_dict["pole"         ] = len(label_dict.keys()) + 1
 label_dict["traffic sign" ] = len(label_dict.keys()) + 1
 label_dict["traffic light"] = len(label_dict.keys()) + 1
+label_dict["billboard"] = len(label_dict.keys()) + 1
 
 label_dict["vegetation"   ] = len(label_dict.keys()) + 1
 label_dict["terrain"      ] = len(label_dict.keys()) + 1
