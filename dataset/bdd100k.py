@@ -7,17 +7,79 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.append("../")
 import storage
 from common import fileio
-from .dataset_base import *
+from dataset_base import *
+
+bdd_seg_dict = {}
+bdd_seg_dict["sidewalk"] = 1
+bdd_seg_dict["building"] = 2
+bdd_seg_dict["wall"] = 3
+bdd_seg_dict["fence"] = 4
+bdd_seg_dict["pole"] = 5
+bdd_seg_dict["traffic light"] = 6
+bdd_seg_dict["billboard"] = 7
+bdd_seg_dict["vegetation"] = 8
+bdd_seg_dict["ground"] = 9
+bdd_seg_dict["sky"] = 10
+bdd_seg_dict["person"] = 11
+bdd_seg_dict["rider"] = 12
+bdd_seg_dict["car"] = 13
+bdd_seg_dict["truck"] = 14
+bdd_seg_dict["bus"] = 15
+bdd_seg_dict["uk"] = 16
+bdd_seg_dict["motorcycle"] = 17
+bdd_seg_dict["bicycle"] = 18
+bdd_seg_dict["out of eval"] = 255
 
 class BDD100k:
+    
     def __init__(self):
         s = storage.Storage()
         self.__data_path = s.dataset_path("bdd100k")
         self.__rgb_path_dict = {}
         self.__json_path_dict = {}
         self.__area_path_dict = {}
+        self.__seg_path_dict = {}
+        self.__segimg_path_dict = {}
         self.__rgb_h, self.__rgb_w = 720, 1280
 
+    def __update_seg_list(self, data_type):
+        assert((data_type == "train") or \
+               (data_type == "val"  ) or \
+               (data_type == "test" ))
+        if not data_type in self.__seg_path_dict.keys():
+            seg_dir_path = os.path.join(self.__data_path, "seg", "labels", data_type)
+            if os.path.exists(seg_dir_path):
+                seg_path_list_ = fileio.get_file_list(tgt_dir = seg_dir_path,
+                                                     tgt_ext = ".png")
+            segimg_dir_path = os.path.join(self.__data_path, "seg", "images", data_type)
+            if os.path.exists(segimg_dir_path):
+                segimg_path_list_ = fileio.get_file_list(tgt_dir = segimg_dir_path,
+                                                        tgt_ext = ".jpg")
+            
+            seg_key_list = []
+            segimg_key_list = []
+            for seg_path in seg_path_list_:
+                name = fileio.get_file_name(seg_path)
+                key  = name[:name.find("_")]
+                seg_key_list.append(key)
+            for img_path in segimg_path_list_:
+                name = fileio.get_file_name(img_path)
+                key  = name[:name.rfind(".")]
+                segimg_key_list.append(key)
+            
+            seg_path_list = []
+            segimg_path_list = []
+            for s in range(len(seg_key_list)):
+                seg_key = seg_key_list[s]
+                if seg_key in segimg_key_list:
+                    seg_path_list.append(seg_path_list_[s])
+                    segimg_path_list.append(segimg_path_list_[segimg_key_list.index(seg_key)])
+            assert(len(seg_path_list) > 0)
+            assert(len(seg_path_list) == len(segimg_path_list))
+
+            self.__seg_path_dict[data_type]    = seg_path_list
+            self.__segimg_path_dict[data_type] = segimg_path_list
+                
     def __update_list(self, data_type):
         assert((data_type == "train") or \
                (data_type == "val"  ) or \
@@ -80,6 +142,46 @@ class BDD100k:
         self.__update_list(data_type)
         return len(self.__rgb_path_dict[data_type])
     
+    def get_seg_sample_num(self, data_type):
+        self.__update_seg_list(data_type)
+        return len(self.__seg_path_dict[data_type])
+    
+    def get_seg_data(self, data_type, index = None):
+        self.__update_list(data_type)
+        if index is None:
+            index = np.random.randint(len(self.__seg_path_dict[data_type]))
+        seg_path = self.__seg_path_dict[data_type][index]
+        seg_arr = np.asarray(Image.open(seg_path))
+
+        rgb_path = self.__segimg_path_dict[data_type][index]
+        rgb_arr = np.asarray(Image.open(rgb_path))
+        return rgb_arr, seg_arr
+    
+    def summary_seg_data(self, rgb_arr, seg_arr):
+        amp = 4
+        font_path = "arial.ttf"
+        font_size = 24
+        font = ImageFont.truetype(font_path, font_size)
+        
+        col = [0,0,255]
+        sum_arr = rgb_arr.copy().astype(np.int)
+        for v in [16]:
+            fill_arr = rgb_arr.copy().astype(np.int)
+            fill_arr[seg_arr == v] = col
+            sum_arr = ((amp - 1) * sum_arr + fill_arr) // amp
+        
+        sum_arr = sum_arr.astype(np.uint8)
+        sum_img = Image.fromarray(sum_arr)
+        draw = ImageDraw.Draw(sum_img, "RGB")
+        cnt = 0
+        for k, v in bdd_seg_dict.items():
+            draw.text([0, cnt],
+                       k,
+                       fill = tuple(col),
+                       font = font)
+            cnt += font_size
+        return sum_img
+
     def get_area_data(self, data_type, index = None):
         self.__update_list(data_type)
         if index is None:
@@ -119,15 +221,14 @@ class BDD100k:
             fill_arr[area_arr == v] = 1
             col = np.zeros(3).astype(np.uint8)
             col[v - 1] = 255
-            if 1:
-                fill_x = rise_x * fill_arr
-                text_x = np.average(fill_x[fill_x > 0])
-                fill_y = rise_y * fill_arr
-                text_y = np.average(fill_y[fill_y > 0])
-                draw.text([text_x, text_y],
-                           k,
-                           fill = tuple(col.tolist()),
-                           font = font)
+            fill_x = rise_x * fill_arr
+            text_x = np.average(fill_x[fill_x > 0])
+            fill_y = rise_y * fill_arr
+            text_y = np.average(fill_y[fill_y > 0])
+            draw.text([text_x, text_y],
+                       k,
+                       fill = tuple(col.tolist()),
+                       font = font)
         return sum_img
 
     def get_vertices_data(self, data_type, index = None):
@@ -230,6 +331,18 @@ class BDD100k:
             if not bdd in label_dict.keys():
                 print(bdd)
                 
+    def list_all_seg_val(self):
+        seg_val = []
+        for data_type in ["val", "train"]:
+            for seg_path in fileio.get_file_list(tgt_dir = os.path.join(self.__data_path, "seg", "labels", data_type),
+                                                 tgt_ext = ".png"):
+                img = Image.open(seg_path)
+                for new_val in np.unique(np.asarray(img)):
+                    if not new_val in seg_val:
+                        seg_val.append(new_val)
+        for val in seg_val:
+            print(val)
+                
     def split_json(self):
         for data_type in ["val", "train"]:
             dst_dir = os.path.join(self.__data_path, "labels", data_type)
@@ -259,6 +372,19 @@ class BDD100k:
                                 out = out + line
                         line = fin.readline()
                         
+def make_seg_summary_img(data_type):
+    b = BDD100k()
+    from tqdm import tqdm
+    dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "seg_test")
+
+    dst_dir = os.path.join(dst_dir_path, data_type)
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+    for i in tqdm(range(b.get_seg_sample_num(data_type))):
+        rgb_arr, seg_arr = b.get_seg_data(data_type, i)
+        b.summary_seg_data(rgb_arr, seg_arr).save( \
+            os.path.join(dst_dir, "{0:06d}.png".format(i)))
+
 def make_area_summary_img(data_type):
     b = BDD100k()
     from tqdm import tqdm
@@ -285,8 +411,5 @@ def make_vertices_summary_img(data_type):
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 if __name__ == "__main__":
-    make_area_summary_img("train")
-    make_area_summary_img("val")
-    make_vertices_summary_img("train")
-    make_vertices_summary_img("val")
+    make_seg_summary_img("val")
     print("Done.")
