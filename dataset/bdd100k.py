@@ -231,7 +231,7 @@ class BDD100k:
                        font = font)
         return sum_img
 
-    def get_vertices_data(self, data_type, index = None):
+    def get_vertices_data(self, data_type, tgt_labels = None, index = None):
         self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
@@ -252,6 +252,9 @@ class BDD100k:
             label_name   = obj["category"]
             if not (label_name in label_dict.keys()):
                 print(label_name)
+            if tgt_labels is not None:
+                if not label_name in tgt_labels:
+                    continue
             assert(label_name in label_dict.keys())
             label_value = label_dict[label_name]
             if label_value != 0:
@@ -398,7 +401,7 @@ def make_area_summary_img(data_type):
         b.summary_area_data(rgb_arr, area_arr).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 
-def make_vertices_summary_img(data_type):
+def make_vertices_summary_img(data_type, tgt_labels):
     b = BDD100k()
     from tqdm import tqdm
     dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "vertices_test")
@@ -407,9 +410,9 @@ def make_vertices_summary_img(data_type):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
     for i in tqdm(range(b.get_sample_num(data_type))):
-        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, i)
+        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, tgt_labels, i)
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 if __name__ == "__main__":
-    make_seg_summary_img("val")
+    make_vertices_summary_img("val", ["car", "truck", "bus", "person", "rider"])
     print("Done.")
