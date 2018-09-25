@@ -54,14 +54,15 @@ label_dict["pole group"   ] = label_dict["pole"   ] + 128
 label_dict["ridergroup"   ] = label_dict["rider"  ] + 128
 label_dict["traingroup"   ] = label_dict["train"  ] + 128
 #zeros
-label_dict["out of roi"] = 0
+label_dict["out of roi"          ] = 0
 label_dict["rectification border"] = 0
-label_dict["ego vehicle"  ] = 0
-label_dict["license plate"] = 0
+label_dict["ego vehicle"         ] = 0
+label_dict["license plate"       ] = 0
+label_dict["out of eval"         ] = 0
 # same value
 label_dict["bike"] = label_dict["motorcycle"]
 label_dict["motor"] = label_dict["motorcycle"]
 
 area_dict = {}
-area_dict["driving lane"] = len(area_dict.keys()) + 1
-area_dict["beyond line"] = len(area_dict.keys()) + 1
+area_dict["driving lane"] = 1
+area_dict["beyond line" ] = 2
