@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.append("../")
 import storage
 from common import fileio
-from dataset_base import *
+from __init__ import label_dict
 
 bdd_seg_dict = {}
 bdd_seg_dict["sidewalk"] = 1
