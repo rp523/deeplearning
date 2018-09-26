@@ -47,7 +47,7 @@ class ImageNetwork:
         else:
             return dtype
     
-    def __get_layer_by_name(self, name):
+    def get_layer(self, name):
         assert(name is not None)
         ret_layer = None
         for layer in self.__layer_list:
@@ -59,12 +59,12 @@ class ImageNetwork:
     def add_layer(self, new_layer):
         name = new_layer.name
         if name is not None:
-            assert(self.__get_layer_by_name(name) is None)
+            assert(self.get_layer(name) is None)
         self.__layer_list.append(new_layer)
     
     def get_input(self, name):
         if name is not None:
-            return self.__get_layer_by_name(name)
+            return self.get_layer(name)
         else:
             return self.__layer_list[-1]
     
@@ -208,10 +208,10 @@ class ImageNetwork:
                            name = name)
         self.add_layer(new_layer)
     
-    def add_loss(self, loss_type, input_name, name):
+    def add_loss(self, loss_type, name, input_name = None):
         answer_layer = self.get_input(input_name)
         label = tf.placeholder(dtype = tf.float32,
-                               shape = [None] + answer_layer.get_shape().tolist())
+                               shape = [None] + list(answer_layer.get_shape())[1:])
         if loss_type == "cross_entropy":
             loss = - tf.reduce_mean(label * tf.log(answer_layer + 1e-5))
         else:
@@ -221,18 +221,8 @@ class ImageNetwork:
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
 
-    def get_loss(self, name_list, weight_dict = None):
-        assert(len(name_list) == len(weight_dict.keys()))
-        total_loss = 0.0
-        for name in name_list:
-            assert(name in self.__loss_dict.keys())
-            if weight_dict is not None:
-                assert(name in weight_dict.keys())
-                weight = weight_dict[name]
-            else:
-                weight = 1.0
-            total_loss = total_loss + weight * self.__loss_dict[name]
-        return total_loss
+    def get_loss(self):
+        return self.__loss_dict
         
     '''        
     def __get_optimizer(self, loss, optimizer_type, learning_rate):
@@ -248,7 +238,7 @@ class ImageNetwork:
         # input image
         feed_dict[self.__layer_list[0]] = input_image
         
-        for name, label in label_dict:
+        for name, label in label_dict.items():
             feed_dict[self.__label_dict[name]] = label
         
         # for dropout
