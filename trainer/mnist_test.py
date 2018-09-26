@@ -9,27 +9,27 @@ from model.network import ImageNetwork
 from transformer import *
 
 class Trainer:
-    def __init__(self, model, x, y_dict, opt_type = "adam"):
+    def __init__(self, model, x, y_dict, lr = 1e-3, opt_type = "adam"):
         self.__model = model
+        self.__label_dict = {}
+        total_loss = 0.0
+        for k, v in y_dict.items():
+            total_loss = total_loss + self.__model.get_loss()[k]
+            self.__label_dict[k] = y_dict[k]
         if opt_type == "adam":
-            self.__opt_func = tf.train.AdamOptimizer
+            self.__optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
         else:
             assert(0)
         self.__x = x
         self.__y_dict = y_dict
-        #self.__sess = tf.Session()
-        #self.__sess.run(tf.global_variables_initializer())
+        self.__sess = tf.Session()
+        self.__sess.run(tf.global_variables_initializer())
 
-    def training(self, lr, batch_size, tgt_loss_list, valid_loss_dict = None):
-        total_loss = 0.0
+    def training(self, lr, batch_size, valid_loss_dict = None):
         label_dict = {}
 
         batch_idx = np.random.choice(np.arange(self.__x.shape[0]), batch_size, replace = True)
         batch_x = self.__x[batch_idx]
-        for tgt_loss in tgt_loss_list:
-            total_loss = total_loss + self.__model.get_loss()[tgt_loss]
-            label_dict[tgt_loss] = self.__y_dict[tgt_loss][batch_idx]
-        optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
     
         #answer_layer = network.get_layer(name = "answer")
         #shape_list = [None] + list(self.__y.shape[1:])
@@ -38,14 +38,14 @@ class Trainer:
         
         #correct = tf.equal(tf.argmax(y, axis = 1), tf.argmax(answer_val, axis = 1))
         #accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
-        
+        label_dict = {}
+        for k, v in self.__label_dict.items():
+            label_dict[k] = v[batch_idx]
         feed_dict = self.__model.make_feed_dict(input_image = batch_x,
                                                 label_dict = label_dict,
                                                 is_training = True)
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
-            sess.run(optimizer, feed_dict = feed_dict)
-    
+        self.__sess.run(tf.global_variables_initializer())
+        self.__sess.run(self.__optimizer, feed_dict = feed_dict)
         
 if __name__ == "__main__":
     
@@ -83,6 +83,5 @@ if __name__ == "__main__":
             print("b=",b, end="")
             trainer.training(lr = lr,
                              batch_size = batch_size,
-                             tgt_loss_list = ["ce_loss"],
                              valid_loss_dict = None)
             print(b)
