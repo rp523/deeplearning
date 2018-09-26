@@ -46,7 +46,7 @@ class MNIST:
     def get_valid_num(self):
         return self.__valid_labels.size
     
-    def get_data(self, data_type, index):
+    def get_data(self, data_type, index = None):
         if   data_type == "train":
             images = self.__train_images
             labels = self.__train_labels
@@ -56,8 +56,12 @@ class MNIST:
         else:
             assert(0)
         
-        ret_images = images[index]
-        ret_labels = labels[index]
+        if index is None:
+            ret_images = images
+            ret_labels = labels
+        else:
+            ret_images = images[index]
+            ret_labels = labels[index]
         
         return ret_images, ret_labels
             
