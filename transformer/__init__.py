@@ -24,6 +24,12 @@ def transform_label(labels_list, labels):
     assert((shrink_label != 0).all())
     return shrink_label
 
+def transform_one_hot(label_vec, class_num):
+    assert(label_vec.ndim == 1)
+    ret = np.zeros((label_vec.size, class_num)).astype(label_vec.dtype)
+    ret[np.arange(ret.shape[0]),label_vec] = 1
+    return ret
+
 if __name__ == "__main__":
     a = np.array([1,1,2,2,0])
     print(a)
