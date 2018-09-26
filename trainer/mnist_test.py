@@ -44,9 +44,21 @@ class Trainer:
         feed_dict = self.__model.make_feed_dict(input_image = batch_x,
                                                 label_dict = label_dict,
                                                 is_training = True)
-        self.__sess.run(tf.global_variables_initializer())
         self.__sess.run(self.__optimizer, feed_dict = feed_dict)
-        
+
+    def show_valid(self, x, y_dict):
+        label_dict = {}
+        for layer_name, label in y_dict.items():
+            label_dict[layer_name] = label
+        feed_dict = self.__model.make_feed_dict(input_image = x,
+                                                is_training = False)
+        metrics = {}
+        for layer_name, label in y_dict.items():
+            ans = self.__model.get_layer(layer_name)
+            correct = tf.equal(tf.argmax(label, axis = 1), tf.argmax(ans, axis = 1))
+            accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+            metrics[layer_name] = self.__sess.run(accuracy)
+        return metrics
 if __name__ == "__main__":
     
     mnist = MNIST()
@@ -74,14 +86,17 @@ if __name__ == "__main__":
     lr = 1e-3
     x, y = mnist.get_data("train")
     y = transform_one_hot(y, 10)
+    xv, yv = mnist.get_data("val")
+    yv = transform_one_hot(yv, 10)
     trainer = Trainer(model = network,
                       x = x,
                       y_dict = {"ce_loss":y})
     for epoch in range(epoch_num):
-        print(epoch)
-        for b in tqdm(range(x.shape[0] // batch_size)):
-            print("b=",b, end="")
+        for b in (range(x.shape[0] // batch_size)):
             trainer.training(lr = lr,
                              batch_size = batch_size,
                              valid_loss_dict = None)
-            print(b)
+            metrics = trainer.show_valid(x = xv,
+                                         y_dict = {"answer":yv})
+            for k, v in metrics.items():
+                print(k, "=", v)

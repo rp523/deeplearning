@@ -232,14 +232,15 @@ class ImageNetwork:
             assert(0)
         return optimizer
     '''
-    def make_feed_dict(self, input_image, label_dict, is_training):
+    def make_feed_dict(self, input_image, is_training, label_dict = None):
         feed_dict = {}
 
         # input image
         feed_dict[self.__layer_list[0]] = input_image
         
-        for name, label in label_dict.items():
-            feed_dict[self.__label_dict[name]] = label
+        if label_dict is not None:
+            for name, label in label_dict.items():
+                feed_dict[self.__label_dict[name]] = label
         
         # for dropout
         if is_training is True:
