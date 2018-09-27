@@ -75,7 +75,7 @@ if __name__ == "__main__":
     network.add_loss("cross_entropy", name = "ce_loss")
     #network.show()
     
-    batch_size = 8
+    batch_size = 16
     epoch_num = 10
     lr = 1e-6
     x, y = mnist.get_data("train")
@@ -86,10 +86,13 @@ if __name__ == "__main__":
                       y_dict = {"ce_loss":y})
     
     for epoch in range(epoch_num):
+        batch_cnt = 0
         for b in (range(x.shape[0] // batch_size)):
+            batch_cnt += batch_size
             trainer.training(lr = lr,
                              batch_size = batch_size,
                              valid_loss_dict = None)
             ans_mat = trainer.predict(xv, ["answer"])[0]
             ans = np.argmax(ans_mat, axis = 1)
-            print(np.average(ans == yv))
+            if b % 100 == 0:
+                print("[epoch={e}/{et}][batch={b}/{bt}] acc={acc}".format(e = epoch, et = epoch_num, b = b, bt = batch_cnt, acc = np.average(ans == yv)))
