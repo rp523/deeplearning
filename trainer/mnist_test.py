@@ -53,7 +53,8 @@ class Trainer:
         for eval_name in eval_name_list:
             out.append(self.__sess.run(self.__model.get_layer(eval_name), feed_dict = feed_dict))
         return out    
-if __name__ == "__main__":
+
+def mnist_trial():
     
     mnist = MNIST()
 

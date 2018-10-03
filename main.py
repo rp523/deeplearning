@@ -1,8 +1,5 @@
 #coding: utf-8
 import sys, os
-from storage import Storage
-
+from trainer.mnist_test import mnist_trial
 if __name__ == "__main__":
-    from dataset.cityscapes import CityScapes
-    c = CityScapes()
-    print(c.get_coarse_img())
+    print(mnist_trial()())
