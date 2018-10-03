@@ -14,8 +14,6 @@ class Storage:
         elif pcname == "Yusuke-PC":
             self.__location = "desktop"
         else:
-            with open("uname_error.txt", "w") as f:
-                f.write(pcname)
             print(pcname)
             assert(0)
     
