@@ -76,7 +76,7 @@ def mnist_trial():
     network.add_loss("cross_entropy", name = "ce_loss")
     #network.show()
     
-    batch_size = 16
+    batch_size = 64
     epoch_num = 10
     lr = 1e-6
     x, y = mnist.get_data("train")
@@ -93,7 +93,8 @@ def mnist_trial():
             trainer.training(lr = lr,
                              batch_size = batch_size,
                              valid_loss_dict = None)
-            ans_mat = trainer.predict(xv, ["answer"])[0]
-            ans = np.argmax(ans_mat, axis = 1)
             if b % 100 == 0:
-                print("[epoch={e}/{et}][batch={b}/{bt}] acc={acc}".format(e = epoch, et = epoch_num, b = b, bt = batch_cnt, acc = np.average(ans == yv)))
+                ans_mat = trainer.predict(xv, ["answer"])[0]
+                ans = np.argmax(ans_mat, axis = 1)
+                acc = np.average(ans == yv)
+                print("[epoch={e}/{et}][batch={b}/{bt}] acc={acc}".format(e = epoch, et = epoch_num, b = batch_cnt, bt = x.shape[0], acc = acc))
