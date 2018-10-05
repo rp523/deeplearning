@@ -9,11 +9,13 @@ class Storage:
         pcname = subprocess.getoutput("uname -n")
         if pcname == "isgsktyktt-VJS111":
             self.__location = "notebook"
-        elif pcname == "floydhub":
+        elif (pcname == "floydhub") or (pcname == "job-instance"):
             self.__location = "floydhub"
         elif pcname == "Yusuke-PC":
             self.__location = "desktop"
         else:
+            with open("uname_err.txt", "w") as f:
+                f.write(pcname)
             print(pcname)
             assert(0)
     
