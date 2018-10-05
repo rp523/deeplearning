@@ -77,8 +77,8 @@ def mnist_trial():
     #network.show()
     
     batch_size = 64
-    epoch_num = 10
-    lr = 1e-6
+    epoch_num = 100
+    lr = 1e-2
     x, y = mnist.get_data("train")
     y = transform_one_hot(y, 10)
     xv, yv = mnist.get_data("val")
