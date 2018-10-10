@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.append("../")
 import storage
 from common import fileio
-from __init__ import label_dict
+from __init__ import Dataset
 
 bdd_seg_dict = {}
 bdd_seg_dict["sidewalk"] = 1
@@ -30,9 +30,10 @@ bdd_seg_dict["motorcycle"] = 17
 bdd_seg_dict["bicycle"] = 18
 bdd_seg_dict["out of eval"] = 255
 
-class BDD100k:
+class BDD100k(Dataset):
     
     def __init__(self):
+        super().__init__()
         s = storage.Storage()
         self.__data_path = s.dataset_path("bdd100k")
         self.__rgb_path_dict = {}
@@ -191,7 +192,7 @@ class BDD100k:
 
         area_path = self.__area_path_dict[data_type][index]
         area_arr = np.asarray(Image.open(area_path))
-        assert(len(area_dict.values()) >= np.max(area_arr))
+        assert(len(super().area_dict.values()) >= np.max(area_arr))
         return rgb_arr, area_arr
     
     def summary_area_data(self, rgb_arr, area_arr):
@@ -201,7 +202,7 @@ class BDD100k:
         font = ImageFont.truetype(font_path, font_size)
 
         sum_arr = rgb_arr.copy().astype(np.int)
-        for k, v in area_dict.items():
+        for k, v in super().area_dict.items():
             fill_img = rgb_arr.copy().astype(np.int)
             col = np.zeros(3).astype(np.int)
             col[v - 1] = 255
@@ -216,7 +217,7 @@ class BDD100k:
         sum_arr = sum_arr.astype(np.uint8)
         sum_img = Image.fromarray(sum_arr)
         draw = ImageDraw.Draw(sum_img, "RGB")
-        for k, v in area_dict.items():
+        for k, v in super().area_dict.items():
             fill_arr = np.zeros((area_arr.shape[0], area_arr.shape[1])).astype(np.float)
             fill_arr[area_arr == v] = 1
             col = np.zeros(3).astype(np.uint8)
@@ -231,7 +232,7 @@ class BDD100k:
                        font = font)
         return sum_img
 
-    def get_vertices_data(self, data_type, tgt_labels = None, index = None):
+    def get_vertices_data(self, data_type, tgt_words_list = None, index = None):
         self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
@@ -250,13 +251,13 @@ class BDD100k:
         
         for obj in obj_list:
             label_name   = obj["category"]
-            if not (label_name in label_dict.keys()):
+            if not (label_name in self.label_dict.keys()):
                 print(label_name)
-            if tgt_labels is not None:
-                if not label_name in tgt_labels:
+            if tgt_words_list is not None:
+                if super().exists_in_words(label_name, tgt_words_list) is False:
                     continue
-            assert(label_name in label_dict.keys())
-            label_value = label_dict[label_name]
+            assert(label_name in self.label_dict.keys())
+            label_value = self.label_dict[label_name]
             if label_value != 0:
                 if "box2d" in obj.keys():
                     box_dict = obj["box2d"]
@@ -278,7 +279,7 @@ class BDD100k:
             self.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).show()
             exit()
 
-        return rgb_arr, rect_labels, rects, poly_labels, polygons
+        return rgb_arr, super().convert_label_org_val(rect_labels, tgt_words_list), rects, poly_labels, polygons
     
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
         font_path = r"C:\Windows\Fonts\Myrica.TTC"
@@ -298,7 +299,7 @@ class BDD100k:
             x1 = (rect[2] * dw)
             y1 = (rect[3] * dh)
             draw.rectangle([x0, y0, x1, y1], outline = red)
-            for k, v in label_dict.items():
+            for k, v in self.label_dict.items():
                 if v == rect_labels[i]:
                     draw.text([max(0, min(dw - 1, x0)),
                                max(0, min(dh - 1, y0 - font_size))],
@@ -309,7 +310,7 @@ class BDD100k:
         for i in range(len(polygons)):
             polygon = (polygons[i].reshape(-1, 2) * [dw , dh])
             draw.polygon(polygon.flatten().tolist(), fill = blue)
-            for k, v in label_dict.items():
+            for k, v in self.label_dict.items():
                 if v == poly_labels[i]:
                     draw.text([max(0, min(dw - 1, np.average(polygon[:, 0]))),
                                max(0, min(dh - 1, np.average(polygon[:, 1])) - font_size)],
@@ -331,7 +332,7 @@ class BDD100k:
                     if not obj["category"] in bdd_cat:
                         bdd_cat.append(obj["category"])
         for bdd in bdd_cat:
-            if not bdd in label_dict.keys():
+            if not bdd in self.label_dict.keys():
                 print(bdd)
                 
     def list_all_seg_val(self):
@@ -405,14 +406,15 @@ def make_vertices_summary_img(data_type, tgt_labels):
     b = BDD100k()
     from tqdm import tqdm
     dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "vertices_test")
-
+    
     dst_dir = os.path.join(dst_dir_path, data_type)
+    print("writing " + dst_dir)
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
     for i in tqdm(range(b.get_sample_num(data_type))):
-        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, tgt_labels, i)
+        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i)
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 if __name__ == "__main__":
-    make_vertices_summary_img("val", ["car", "truck", "bus", "person", "rider"])
+    make_vertices_summary_img("val", [["car", "truck", "bus"], ["person", "rider"]])
     print("Done.")

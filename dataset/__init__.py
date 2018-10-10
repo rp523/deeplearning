@@ -1,83 +1,95 @@
 #coding:utf-8
 import numpy as np
-label_dict = {}
 
-# non-zero values
-label_dict["road"         ] = len(label_dict.keys()) + 1
-label_dict["sidewalk"     ] = len(label_dict.keys()) + 1
-label_dict["parking"      ] = len(label_dict.keys()) + 1
-label_dict["rail track"   ] = len(label_dict.keys()) + 1
 
-label_dict["person"       ] = len(label_dict.keys()) + 1
-label_dict["rider"        ] = len(label_dict.keys()) + 1
-
-label_dict["car"          ] = len(label_dict.keys()) + 1
-label_dict["truck"        ] = len(label_dict.keys()) + 1
-label_dict["bus"          ] = len(label_dict.keys()) + 1
-label_dict["on rails"     ] = len(label_dict.keys()) + 1
-label_dict["bicycle"      ] = len(label_dict.keys()) + 1
-label_dict["caravan"      ] = len(label_dict.keys()) + 1
-label_dict["trailer"      ] = len(label_dict.keys()) + 1
-label_dict["train"        ] = len(label_dict.keys()) + 1
-label_dict["motorcycle"   ] = len(label_dict.keys()) + 1
-
-label_dict["building"     ] = len(label_dict.keys()) + 1
-label_dict["wall"         ] = len(label_dict.keys()) + 1
-label_dict["fence"        ] = len(label_dict.keys()) + 1
-label_dict["guard rail"   ] = len(label_dict.keys()) + 1
-label_dict["bridge"       ] = len(label_dict.keys()) + 1
-label_dict["tunnel"       ] = len(label_dict.keys()) + 1
-
-label_dict["pole"         ] = len(label_dict.keys()) + 1
-label_dict["traffic sign" ] = len(label_dict.keys()) + 1
-label_dict["traffic light"] = len(label_dict.keys()) + 1
-label_dict["billboard"] = len(label_dict.keys()) + 1
-
-label_dict["vegetation"   ] = len(label_dict.keys()) + 1
-label_dict["terrain"      ] = len(label_dict.keys()) + 1
-
-label_dict["sky"          ] = len(label_dict.keys()) + 1
-
-label_dict["ground"       ] = len(label_dict.keys()) + 1
-label_dict["dynamic"      ] = len(label_dict.keys()) + 1
-label_dict["static"       ] = len(label_dict.keys()) + 1
-label_dict["lane"         ] = len(label_dict.keys()) + 1
-label_dict["drivable area"] = len(label_dict.keys()) + 1
-
-# groups
-label_dict["cargroup"     ] = label_dict["car"    ] + 128
-label_dict["truckgroup"   ] = label_dict["truck"  ] + 128
-label_dict["busgroup"     ] = label_dict["bus"    ] + 128
-label_dict["bicyclegroup" ] = label_dict["bicycle"] + 128
-label_dict["persongroup"  ] = label_dict["person" ] + 128
-label_dict["pole group"   ] = label_dict["pole"   ] + 128
-label_dict["ridergroup"   ] = label_dict["rider"  ] + 128
-label_dict["traingroup"   ] = label_dict["train"  ] + 128
-label_dict["polegroup"   ]  = label_dict["pole"   ] + 128
-#zeros
-label_dict["out of roi"          ] = 0
-label_dict["rectification border"] = 0
-label_dict["ego vehicle"         ] = 0
-label_dict["license plate"       ] = 0
-label_dict["out of eval"         ] = 0
-# same value
-label_dict["bike"] = label_dict["motorcycle"]
-label_dict["motor"] = label_dict["motorcycle"]
-
-area_dict = {}
-area_dict["driving lane"] = 1
-area_dict["beyond line" ] = 2
-
-def convert_label_org_val(src_labels, words_list):
-    conv = np.zeros(len(label_dict.keys())).astype(np.int)
+class Dataset:
     
-    for i in range(len(words_list)):
-        words = words_list[i]
-        for word in words:
-            conv[label_dict[word]] = i + 1
+    def __init__(self):
+        self.label_dict = {}
+        # non-zero values
+        self.label_dict["road"         ] = len(self.label_dict.keys()) + 1
+        self.label_dict["sidewalk"     ] = len(self.label_dict.keys()) + 1
+        self.label_dict["parking"      ] = len(self.label_dict.keys()) + 1
+        self.label_dict["rail track"   ] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["person"       ] = len(self.label_dict.keys()) + 1
+        self.label_dict["rider"        ] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["car"          ] = len(self.label_dict.keys()) + 1
+        self.label_dict["truck"        ] = len(self.label_dict.keys()) + 1
+        self.label_dict["bus"          ] = len(self.label_dict.keys()) + 1
+        self.label_dict["on rails"     ] = len(self.label_dict.keys()) + 1
+        self.label_dict["bicycle"      ] = len(self.label_dict.keys()) + 1
+        self.label_dict["caravan"      ] = len(self.label_dict.keys()) + 1
+        self.label_dict["trailer"      ] = len(self.label_dict.keys()) + 1
+        self.label_dict["train"        ] = len(self.label_dict.keys()) + 1
+        self.label_dict["motorcycle"   ] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["building"     ] = len(self.label_dict.keys()) + 1
+        self.label_dict["wall"         ] = len(self.label_dict.keys()) + 1
+        self.label_dict["fence"        ] = len(self.label_dict.keys()) + 1
+        self.label_dict["guard rail"   ] = len(self.label_dict.keys()) + 1
+        self.label_dict["bridge"       ] = len(self.label_dict.keys()) + 1
+        self.label_dict["tunnel"       ] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["pole"         ] = len(self.label_dict.keys()) + 1
+        self.label_dict["traffic sign" ] = len(self.label_dict.keys()) + 1
+        self.label_dict["traffic light"] = len(self.label_dict.keys()) + 1
+        self.label_dict["billboard"] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["vegetation"   ] = len(self.label_dict.keys()) + 1
+        self.label_dict["terrain"      ] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["sky"          ] = len(self.label_dict.keys()) + 1
+        
+        self.label_dict["ground"       ] = len(self.label_dict.keys()) + 1
+        self.label_dict["dynamic"      ] = len(self.label_dict.keys()) + 1
+        self.label_dict["static"       ] = len(self.label_dict.keys()) + 1
+        self.label_dict["lane"         ] = len(self.label_dict.keys()) + 1
+        self.label_dict["drivable area"] = len(self.label_dict.keys()) + 1
+        
+        # groups
+        self.label_dict["cargroup"     ] = self.label_dict["car"    ] + 128
+        self.label_dict["truckgroup"   ] = self.label_dict["truck"  ] + 128
+        self.label_dict["busgroup"     ] = self.label_dict["bus"    ] + 128
+        self.label_dict["bicyclegroup" ] = self.label_dict["bicycle"] + 128
+        self.label_dict["persongroup"  ] = self.label_dict["person" ] + 128
+        self.label_dict["pole group"   ] = self.label_dict["pole"   ] + 128
+        self.label_dict["ridergroup"   ] = self.label_dict["rider"  ] + 128
+        self.label_dict["traingroup"   ] = self.label_dict["train"  ] + 128
+        self.label_dict["polegroup"   ]  = self.label_dict["pole"   ] + 128
+        #zeros
+        self.label_dict["out of roi"          ] = 0
+        self.label_dict["rectification border"] = 0
+        self.label_dict["ego vehicle"         ] = 0
+        self.label_dict["license plate"       ] = 0
+        self.label_dict["out of eval"         ] = 0
+        # same value
+        self.label_dict["bike"] = self.label_dict["motorcycle"]
+        self.label_dict["motor"] = self.label_dict["motorcycle"]
+        
+        self.area_dict = {}
+        self.area_dict["driving lane"] = 1
+        self.area_dict["beyond line" ] = 2
     
-    dst_labels = src_labels.copy()
-    for i in range(src_labels.size):
-        dst_labels[i] = conv[src_labels[i]]
+    def convert_label_org_val(self, src_labels, words_list = None):
+        if words_list is None:
+            return src_labels
+            
+        conv = np.zeros(len(self.label_dict.keys())).astype(np.int)
+        for i in range(len(words_list)):
+            words = words_list[i]
+            for word in words:
+                conv[self.label_dict[word]] = i + 1
+        dst_labels = src_labels.copy()
+        for i in range(src_labels.size):
+            dst_labels[i] = conv[src_labels[i]]
+        return dst_labels
     
-    return dst_labels
+    def exists_in_words(self, label_word, words_list):
+        exists = False
+        for words in words_list:
+            if label_word in words:
+                exists = True
+                break
+        return exists
