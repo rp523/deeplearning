@@ -1,5 +1,5 @@
 #coding:utf-8
-
+import numpy as np
 label_dict = {}
 
 # non-zero values
@@ -67,3 +67,17 @@ label_dict["motor"] = label_dict["motorcycle"]
 area_dict = {}
 area_dict["driving lane"] = 1
 area_dict["beyond line" ] = 2
+
+def convert_label_org_val(src_labels, words_list):
+    conv = np.zeros(len(label_dict.keys())).astype(np.int)
+    
+    for i in range(len(words_list)):
+        words = words_list[i]
+        for word in words:
+            conv[label_dict[word]] = i + 1
+    
+    dst_labels = src_labels.copy()
+    for i in range(src_labels.size):
+        dst_labels[i] = conv[src_labels[i]]
+    
+    return dst_labels
