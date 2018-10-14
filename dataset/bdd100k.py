@@ -32,7 +32,7 @@ bdd_seg_dict["out of eval"] = 255
 
 class BDD100k(Dataset):
     
-    def __init__(self, scale_y = 1, scale_x = 1):
+    def __init__(self, resized_h = 720, resized_w = 1280):
         super().__init__()
         s = storage.Storage()
         self.__data_path = s.dataset_path("bdd100k")
@@ -42,8 +42,8 @@ class BDD100k(Dataset):
         self.__seg_path_dict = {}
         self.__segimg_path_dict = {}
         self.__rgb_h, self.__rgb_w = 720, 1280
-        self.__scale_y = scale_y
-        self.__scale_x = scale_x
+        self.__resized_h = resized_h
+        self.__resized_w = resized_w
 
     def __update_seg_list(self, data_type):
         assert((data_type == "train") or \
@@ -280,8 +280,7 @@ class BDD100k(Dataset):
         rgb_path = self.__rgb_path_dict[data_type][index]
         rgb_pil = Image.open(rgb_path)
         rgb_pil_w, rgb_pil_h = rgb_pil.size
-        rgb_pil = rgb_pil.resize((rgb_pil_w // self.__scale_x,
-                                  rgb_pil_h // self.__scale_y))
+        rgb_pil = rgb_pil.resize((self.__resized_w, self.__resized_h))
         rgb_arr = np.asarray(rgb_pil)
         
         if 0: #debug view
