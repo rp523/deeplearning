@@ -265,7 +265,7 @@ class BDD100k(Dataset):
                     x1 = box_dict["x2"] / self.__rgb_w
                     y0 = box_dict["y1"] / self.__rgb_h
                     y1 = box_dict["y2"] / self.__rgb_h
-                    rects = np.append(rects, np.array([x0, y0, x1, y1]).reshape(1, 4), axis = 0)
+                    rects = np.append(rects, np.array([y0, x0, y1, x1]).reshape(1, 4), axis = 0)
                     rect_labels = np.append(rect_labels, label_value)
                 elif "poly2d" in obj.keys():
                     polygon = np.array(obj["poly2d"][0]["vertices"]).reshape(-1, 2)
@@ -302,10 +302,10 @@ class BDD100k(Dataset):
         dw, dh = rgb_img.size
         for i in range(rects.shape[0]):
             rect = rects[i]
-            x0 = (rect[0] * dw)
-            y0 = (rect[1] * dh)
-            x1 = (rect[2] * dw)
-            y1 = (rect[3] * dh)
+            y0 = (rect[0] * dh)
+            x0 = (rect[1] * dw)
+            y1 = (rect[2] * dh)
+            x1 = (rect[3] * dw)
             draw.rectangle([x0, y0, x1, y1], outline = red)
             for k, v in self.label_dict.items():
                 if v == rect_labels[i]:
