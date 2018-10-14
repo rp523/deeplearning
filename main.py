@@ -1,6 +1,6 @@
 #coding: utf-8
 import sys, os
-from trainer.mnist_test import mnist_trial
+from trainer.focal_test import focal_trial
 if __name__ == "__main__":
-    mnist_trial()
+    focal_trial()
     print("Done.")
