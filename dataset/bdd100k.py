@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.append("../")
 import storage
 from common import fileio
-from __init__ import Dataset
+from dataset.__init__ import Dataset
 
 bdd_seg_dict = {}
 bdd_seg_dict["sidewalk"] = 1
@@ -32,7 +32,7 @@ bdd_seg_dict["out of eval"] = 255
 
 class BDD100k(Dataset):
     
-    def __init__(self):
+    def __init__(self, scale_y = 1, scale_x = 1):
         super().__init__()
         s = storage.Storage()
         self.__data_path = s.dataset_path("bdd100k")
@@ -42,6 +42,8 @@ class BDD100k(Dataset):
         self.__seg_path_dict = {}
         self.__segimg_path_dict = {}
         self.__rgb_h, self.__rgb_w = 720, 1280
+        self.__scale_y = scale_y
+        self.__scale_x = scale_x
 
     def __update_seg_list(self, data_type):
         assert((data_type == "train") or \
@@ -236,8 +238,6 @@ class BDD100k(Dataset):
         self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
-        rgb_path = self.__rgb_path_dict[data_type][index]
-        rgb_arr = np.asarray(Image.open(rgb_path))
         
         json_path = self.__json_path_dict[data_type][index]
 
@@ -275,11 +275,20 @@ class BDD100k(Dataset):
                         polygons.append(polygon)
                     poly_labels = np.append(poly_labels, label_value)
     
+        rect_labels = super().convert_label_org_val(rect_labels, tgt_words_list)
+        
+        rgb_path = self.__rgb_path_dict[data_type][index]
+        rgb_pil = Image.open(rgb_path)
+        rgb_pil_w, rgb_pil_h = rgb_pil.size
+        rgb_pil = rgb_pil.resize((rgb_pil_w // self.__scale_x,
+                                  rgb_pil_h // self.__scale_y))
+        rgb_arr = np.asarray(rgb_pil)
+        
         if 0: #debug view
             self.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).show()
             exit()
-
-        return rgb_arr, super().convert_label_org_val(rect_labels, tgt_words_list), rects, poly_labels, polygons
+        
+        return rgb_arr, rect_labels, rects, poly_labels, polygons
     
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
         font_path = r"C:\Windows\Fonts\Myrica.TTC"
