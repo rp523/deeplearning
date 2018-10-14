@@ -68,9 +68,13 @@ class ImageNetwork:
         else:
             return self.__layer_list[-1]
     
-    def show(self):
+    def show_all(self):
         for layer in self.__layer_list:
             print(layer.name, layer.get_shape())
+
+    def show_layer(self, name):
+        layer = self.get_layer(name)
+        print(layer.name, layer.get_shape())
         
     def add_full_connect(self, output_ch, name = None, input_name = None, dtype = None):
         input_layer = self.get_input(input_name)
@@ -89,6 +93,27 @@ class ImageNetwork:
         new_layer = tf.add(tf.matmul(input_layer, weight), bias, name = name)
         self.add_layer(new_layer)
     
+    def add_upsample(self, scale_y, scale_x, upType = "nn", name = None, input_name = None):
+        input_layer = self.get_input(input_name)
+        input_shape = input_layer.get_shape().as_list()
+        if upType == "nn":
+            method = tf.image.ResizeMethod.NEAREST_NEIGHBOR
+        elif upType == "bilinear":
+            method = tf.image.ResizeMethod.BILINEAR
+        elif upType == "bicubic":
+            method = tf.image.ResizeMethod.BICUBIC
+        elif upType == "area":
+            method = tf.image.ResizeMethod.AREA
+        else:
+            assert(0 & upType)
+        new_layer = tf.image.resize_images(
+                        input_layer,
+                        [input_shape[1] * scale_y, input_shape[2] * scale_x],
+                        method = method)
+        if name is not None:
+            new_layer = tf.identity(new_layer, name = name)
+        self.add_layer(new_layer)
+
     class FilterParam:
         def __init__(self, kernel_y, kernel_x, stride_y, stride_x, padding):
             self.kernel_y = kernel_y
@@ -99,6 +124,7 @@ class ImageNetwork:
 
     def add_conv(self, filter_param, output_ch, bias = True, name = None, input_name = None, dtype = None):
         input_layer = self.get_input(input_name)
+        assert(input_layer is not None)
         new_layer = self.make_conv(input_layer, filter_param, output_ch, bias, name)
         self.add_layer(new_layer)
         
@@ -158,7 +184,7 @@ class ImageNetwork:
             activ_func = tf.nn.tanh
         else:
             assert(0)
-        new_layer = activ_func(input_layer)
+        new_layer = activ_func(input_layer, name = name)
         self.add_layer(new_layer)
     
     def add_batchnorm(self, global_norm = True, name = None, input_name = None, dtype = None):
