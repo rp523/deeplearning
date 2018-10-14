@@ -188,6 +188,11 @@ class ImageNetwork:
         self.add_conv(filter_param, output_ch, bias, input_name = input_name)
         self.add_batchnorm(global_norm, name)
         
+    def add_conv_batchnorm_act(self, filter_param, output_ch, activatioin_type, bias = True, global_norm = True, name = None, input_name = None):
+        self.add_conv(filter_param, output_ch, bias, input_name = input_name)
+        self.add_batchnorm(global_norm)
+        self.add_activation(activatioin_type, name)
+
     def add_softmax(self, name = None, input_name = None):
         input_layer = self.get_input(input_name)
         new_layer = tf.nn.softmax(logits = input_layer,
