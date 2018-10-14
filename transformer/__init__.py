@@ -102,20 +102,19 @@ def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     base_rect_mat = base_rect_mat.reshape(-1, 4)
     assert(base_rect_mat.ndim == 2)
     assert(base_rect_mat.shape[1] == 4)
+    center = base_rect_mat.reshape(-1, 2, 2).mean(axis = -2)
             
     anchors = np.empty((len(size_list), len(asp_list), anchor_div_y * anchor_div_x, 4)).astype(np.float32)
     for s in range(len(size_list)):
         for a in range(len(asp_list)):
             h = np.abs(base_rect_mat[:,2] - base_rect_mat[:,0]) * size_list[s] / np.sqrt(asp_list[a])
             w = np.abs(base_rect_mat[:,3] - base_rect_mat[:,1]) * size_list[s] * np.sqrt(asp_list[a])
-            anchors[s, a, :, 0] = 0.5 * (base_rect_mat[:,0] + base_rect_mat[:,2]) - 0.5 * h 
-            anchors[s, a, :, 1] = 0.5 * (base_rect_mat[:,1] + base_rect_mat[:,3]) - 0.5 * w 
-            anchors[s, a, :, 2] = 0.5 * (base_rect_mat[:,0] + base_rect_mat[:,2]) + 0.5 * h 
-            anchors[s, a, :, 3] = 0.5 * (base_rect_mat[:,1] + base_rect_mat[:,3]) + 0.5 * w
-    anchors[:,:,:,0][anchors[:,:,:,0] <= 0.0] = 0.0
-    anchors[:,:,:,1][anchors[:,:,:,1] <= 0.0] = 0.0
-    anchors[:,:,:,2][anchors[:,:,:,2] >= 1.0] = 1.0
-    anchors[:,:,:,3][anchors[:,:,:,3] >= 1.0] = 1.0
+            anchors[s, a, :, 0] = center[:,0] - 0.5 * h 
+            anchors[s, a, :, 1] = center[:,1] - 0.5 * w 
+            anchors[s, a, :, 2] = center[:,0] + 0.5 * h 
+            anchors[s, a, :, 3] = center[:,1] + 0.5 * w
+    anchors[anchors <= 0.0] = 0.0
+    anchors[anchors >= 1.0] = 1.0
     assert((anchors <= 1.0).all())
     assert((anchors >= 0.0).all())
     assert(anchors.ndim == 4)
@@ -123,29 +122,26 @@ def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     return anchors.reshape(-1, 4)
 
 if __name__ == "__main__":
-    img_arr = np.zeros((500, 500)).astype(np.uint8)
+    img_h, img_w = 900, 1500
+    img_arr = np.zeros((img_h, img_w)).astype(np.uint8)
     from PIL import Image, ImageDraw
     pil_img = Image.fromarray(img_arr)
     draw = ImageDraw.Draw(pil_img)
-    size_list = [1.0]
-    asp_list = [0.5, 1.0, 2.0]
-    anchor = make_anchor([3,3], size_list, asp_list)
+    size_list = [2.0**0.0, 2.0**0.25, 2.0**0.50, 2.0**0.75]
+    asp_list = [0.5, 1.0, 1.5]
+    div_y = 10
+    div_x = 10
+    anchor = make_anchor([div_y, div_x], size_list, asp_list)
     print(anchor.shape)
     n = 0
-    for s in range(len(size_list)):
-        for a in range(len(asp_list)):
-            if 1 == a:
-                rect = anchor[s * len(asp_list) + a]
-                assert(rect.size == 4)
-                y0 = rect[0] * 500
-                x0 = rect[1] * 500
-                y1 = rect[2] * 500
-                x1 = rect[3] * 500
-                draw.rectangle((x0, y0, x1, y1),
-                               fill = 0,
-                               outline = 255)
-                draw.text(((x0+x1)/2, (y0+y1)/2),
-                          text = str(n))
-                n += 1
-            pass
+    for rect in anchor:
+        assert(rect.size == 4)
+        y0 = rect[0] * img_h
+        x0 = rect[1] * img_w
+        y1 = rect[2] * img_h
+        x1 = rect[3] * img_w
+        draw.rectangle((x0, y0, x1, y1),
+                       #fill = 0,
+                       outline = 255)
+        #draw.text(((x0+x1)/2, (y0+y1)/2), text = str(n))
     pil_img.show()
