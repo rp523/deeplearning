@@ -2,7 +2,7 @@
 import os, sys
 import numpy as np
 sys.path.append("../")
-from dataset import label_dict
+from dataset import Dataset
 
 
 def transform_seg_label(labels_list, label_map):
@@ -11,7 +11,7 @@ def transform_seg_label(labels_list, label_map):
     label_cnt = 1
     for labels in labels_list:
         for label in labels:
-            ret[ret == label_dict[label]] = label_cnt
+            ret[ret == Dataset().label_dict[label]] = label_cnt
         label_cnt += 1
 
 def transform_label(labels_list, labels):
@@ -19,7 +19,7 @@ def transform_label(labels_list, labels):
     label_cnt = 1
     for labels in labels_list:
         for label in labels:
-            shrink_label[shrink_label == label_dict[label]] = 1
+            shrink_label[shrink_label == Dataset().label_dict[label]] = 1
         label_cnt += 1
     assert((shrink_label != 0).all())
     return shrink_label
