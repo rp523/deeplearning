@@ -88,15 +88,8 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     anchor_label_val[is_neg_anchor] = 0
 
     return anchor_label_val
-    
-def make_reg_anchor(anchors):
-    anchor_h = anchors[:, 2] - anchors[:, 0]
-    anchor_w = anchors[:, 3] - anchors[:, 1]
-    assert((anchor_h > 0.0).all())
-    assert((anchor_w > 0.0).all())
-    reg_anchor = np.empty(anchors.shape).astype(np.float32)
-    
-    
+
+
 def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     # まずasp=1.0, size=1.0で作る
     anchor_div_y = anchor_div[0]

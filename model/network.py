@@ -239,18 +239,76 @@ class ImageNetwork:
                            name = name)
         self.add_layer(new_layer)
     
-    def add_loss(self, loss_type, name, input_name = None):
-        answer_layer = self.get_input(input_name)
+    def add_loss(self, loss_type, name, input_name = None, gamma = None):
+        pred_layer = self.get_input(input_name)
         label = tf.placeholder(dtype = tf.float32,
-                               shape = [None] + list(answer_layer.get_shape())[1:])
+                               shape = [None] + list(pred_layer.get_shape())[1:])
         if loss_type == "cross_entropy":
-            loss = - tf.reduce_mean(label * tf.log(answer_layer + 1e-5))
+            loss = - tf.reduce_mean(label * tf.log(pred_layer + 1e-5))
+        elif loss_type == "L1":
+            loss = tf.reduce_mean(label - pred_layer)
         else:
             assert(0)
         assert(not name in self.__loss_dict.keys())
         assert(not name in self.__label_dict.keys())
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
+
+    def add_reg_loss(self, name, anchor, gamma,
+                      cls_layer_name, reg_layer_name,
+                      cls_label_name, reg_label_name):
+        pred_cls = self.get_input(cls_layer_name)
+        pred_reg = self.get_input(reg_layer_name)
+        label_cls = tf.placeholder(dtype = tf.int32,
+                                   shape = [None] + list(pred_cls.get_shape())[1:])
+        label_reg = tf.placeholder(dtype = tf.float32,
+                                   shape = [None] + list(pred_reg.get_shape())[1:])
+        valid = (label_cls >= 0)
+        # label
+        label_reg = tf.reshape(label_reg, [-1, 4])
+        label_h  = label_reg[:,2] - label_reg[:,0]
+        label_w  = label_reg[:,3] - label_reg[:,1]
+        label_yc = 0.5 * (label_reg[:,2] - label_reg[:,0])
+        label_xc = 0.5 * (label_reg[:,3] - label_reg[:,1])
+        # pred
+        pred_reg = tf.reshape(pred_reg, [-1, 4])
+        pred_h  = pred_reg[:,2] - pred_reg[:,0]
+        pred_w  = pred_reg[:,3] - pred_reg[:,1]
+        pred_yc = 0.5 * (pred_reg[:,2] - pred_reg[:,0])
+        pred_xc = 0.5 * (pred_reg[:,3] - pred_reg[:,1])
+        # anchor
+        anchor_h  = anchor[:,2] - anchor[:,0]
+        anchor_w  = anchor[:,3] - anchor[:,1]
+        anchor_yc = 0.5 * (anchor[:,2] - anchor[:,0])
+        anchor_xc = 0.5 * (anchor[:,3] - anchor[:,1])
+        # label-t
+        label_ty = (label_yc - anchor_yc) / anchor_h
+        label_tx = (label_xc - anchor_xc) / anchor_w
+        label_h  = tf.log(label_h / anchor_h)
+        label_w  = tf.log(label_w / anchor_w)
+        # pred-t
+        pred_ty = (pred_yc - anchor_yc) / anchor_h
+        pred_tx = (pred_xc - anchor_xc) / anchor_w
+        pred_h  = tf.log(pred_h / anchor_h)
+        pred_w  = tf.log(pred_w / anchor_w)
+        # loss
+        loss_ty = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_ty - label_ty), valid))
+        loss_tx = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_tx - label_tx), valid))
+        loss_h  = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_h  - label_h ), valid))
+        loss_w  = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_w  - label_w ), valid))
+        reg_loss = loss_ty + loss_tx + loss_h + loss_w
+        
+        assert(not reg_label_name in self.__loss_dict.keys())
+        assert(not reg_label_name in self.__label_dict.keys())
+        self.__loss_dict[reg_label_name]  = reg_loss
+        self.__label_dict[reg_label_name] = label_reg
+
+        cls_loss = tf.reduce_mean(- (      label_cls) * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
+                                  - (1.0 - label_cls) * ((      pred_cls) ** gamma) * tf.log((1.0 - pred_cls) + 1e-5))
+        assert(not cls_label_name in self.__loss_dict.keys())
+        assert(not cls_label_name in self.__label_dict.keys())
+        self.__loss_dict[cls_label_name]  = cls_loss
+        self.__label_dict[cls_label_name] = label_cls
 
     def get_loss(self):
         return self.__loss_dict
