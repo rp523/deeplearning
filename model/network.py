@@ -34,6 +34,8 @@ class ImageNetwork:
         self.__loss_dict = {}
         self.__label_dict = {}
         
+        self.__feed_dict = {}
+        
     def __get_padding_str(self, padding):
         assert(isinstance(padding, bool))
         if padding:
@@ -254,15 +256,23 @@ class ImageNetwork:
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
 
-    def add_reg_loss(self, name, anchor, gamma,
+    def add_rect_loss(self, name, gamma,
                       cls_layer_name, reg_layer_name,
                       cls_label_name, reg_label_name):
         pred_cls = self.get_input(cls_layer_name)
         pred_reg = self.get_input(reg_layer_name)
+        pred_shape = pred_reg.get_shape().as_list()
+        div_y = pred_shape[1]
+        div_x = pred_shape[2]
+        rect_ch = pred_shape[3] // 4
+        cls_num = pred_reg.get_shape().as_list()[3] // rect_ch
+        
         label_cls = tf.placeholder(dtype = tf.int32,
-                                   shape = [None] + list(pred_cls.get_shape())[1:])
+                                   shape = [None, div_y, div_x, rect_ch]) # NOT one-hot
         label_reg = tf.placeholder(dtype = tf.float32,
-                                   shape = [None] + list(pred_reg.get_shape())[1:])
+                                   shape = [None, div_y, div_x, rect_ch, 4])
+        anchor    = tf.placeholder(dtype = tf.float32,
+                                   shape = [None, div_y, div_x, rect_ch, 4])
         valid = (label_cls >= 0)
         # label
         label_reg = tf.reshape(label_reg, [-1, 4])
@@ -277,10 +287,14 @@ class ImageNetwork:
         pred_yc = 0.5 * (pred_reg[:,2] - pred_reg[:,0])
         pred_xc = 0.5 * (pred_reg[:,3] - pred_reg[:,1])
         # anchor
-        anchor_h  = anchor[:,2] - anchor[:,0]
-        anchor_w  = anchor[:,3] - anchor[:,1]
-        anchor_yc = 0.5 * (anchor[:,2] - anchor[:,0])
-        anchor_xc = 0.5 * (anchor[:,3] - anchor[:,1])
+        anchor_y0 = anchor[:,:,:,:,0]
+        anchor_x0 = anchor[:,:,:,:,1]
+        anchor_y1 = anchor[:,:,:,:,2]
+        anchor_x1 = anchor[:,:,:,:,3]
+        anchor_h  = anchor_y1 - anchor_y0
+        anchor_w  = anchor_x1 - anchor_x0
+        anchor_yc = 0.5 * (anchor_y0 + anchor_y1)
+        anchor_xc = 0.5 * (anchor_x0 + anchor_x1)
         # label-t
         label_ty = (label_yc - anchor_yc) / anchor_h
         label_tx = (label_xc - anchor_xc) / anchor_w
@@ -302,13 +316,17 @@ class ImageNetwork:
         assert(not reg_label_name in self.__label_dict.keys())
         self.__loss_dict[reg_label_name]  = reg_loss
         self.__label_dict[reg_label_name] = label_reg
-
-        cls_loss = tf.reduce_mean(- (      label_cls) * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
-                                  - (1.0 - label_cls) * ((      pred_cls) ** gamma) * tf.log((1.0 - pred_cls) + 1e-5))
-        assert(not cls_label_name in self.__loss_dict.keys())
+        
+        label_cls_onehot = tf.one_hot(label_cls, depth = cls_num)
+        pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
+        cls_loss_vec = (- (      label_cls_onehot) * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
+                        - (1.0 - label_cls_onehot) * ((      pred_cls) ** gamma) * tf.log((1.0 - pred_cls) + 1e-5))
+        cls_loss = tf.reduce_mean(tf.boolean_mask(cls_loss_vec, valid))
+        assert(not label_cls_onehot in self.__loss_dict.keys())
         assert(not cls_label_name in self.__label_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
         self.__label_dict[cls_label_name] = label_cls
+        self.__feed_dict["anchor"] = anchor
 
     def get_loss(self):
         return self.__loss_dict
@@ -322,24 +340,23 @@ class ImageNetwork:
         return optimizer
     '''
     def make_feed_dict(self, input_image, is_training, label_dict = None):
-        feed_dict = {}
 
         # input image
-        feed_dict[self.__layer_list[0]] = input_image
+        self.__feed_dict[self.__layer_list[0]] = input_image
         
         if label_dict is not None:
             for name, label in label_dict.items():
-                feed_dict[self.__label_dict[name]] = label
+                self.__feed_dict[self.__label_dict[name]] = label
         
         # for dropout
         if is_training is True:
             for dropout_idx in range(len(self.__dropout_ph_list)):
-                feed_dict[self.__dropout_ph_list[dropout_idx]] = self.__dropout_val_list[dropout_idx]
+                self.__feed_dict[self.__dropout_ph_list[dropout_idx]] = self.__dropout_val_list[dropout_idx]
         else:
             for dropout_idx in range(len(self.__dropout_ph_list)):
-                feed_dict[self.__dropout_ph_list[dropout_idx]] = 1.0
+                self.__feed_dict[self.__dropout_ph_list[dropout_idx]] = 1.0
         
-        return feed_dict
+        return self.__feed_dict
     
     # to be deleted
     def fit(self, train_x, train_y, valid_x, valid_y, loss_type, optimizer_type, learning_rate, epoch_num, batch_size, log_interval = 1):

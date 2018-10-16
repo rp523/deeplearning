@@ -10,6 +10,9 @@ from transformer import *
 from trainer import Trainer
 
 def focal_trial():
+    tgt_words_list = [["car", "truck", "bus"], ["person", "rider"]]
+    anchor_size = 2.0 ** np.arange(0.0, 1.0, 0.25)
+    anchor_asp  = np.linspace(0.5, 2.0, 3)
     
     bdd = BDD100k(resized_h = 128,
                   resized_w = 256)
@@ -77,12 +80,36 @@ def focal_trial():
     network.add_softmax("answer")
     network.add_loss("cross_entropy", name = "ce_loss")
     
-    network.show_layer("c2")
-    network.show_layer("c3")
-    network.show_layer("c4")
-    network.show_layer("c5")
-    exit()
+    for i in range(2, 5 + 1):
+        # classificatin
+        feature_layer_name = "c{}".format(i)
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
+        for l in range(4 - 1 - 1):
+            network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * (1 + len(tgt_words_list)), "relu",
+                                       name = "cls{}".format(i))
+        # regression
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
+        for l in range(4 - 1 - 1):
+            network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * 4, "relu",
+                                       name = "reg{}".format(i))
+        terminal_shape = network.get_layer("reg{}".format(i)).get_shape().as_list()
+        network.add_rect_loss(name = "loss{}".format(i),
+                              gamma = 2.0,
+                              cls_layer_name = "cls{}".format(i),
+                              reg_layer_name = "reg{}".format(i),
+                              cls_label_name = "cls_loss{}".format(i),
+                              reg_label_name = "reg_loss{}".format(i))
     
+    for i in range(2, 5 + 1):
+        network.show_layer("cls{}".format(i))
+        network.show_layer("reg{}".format(i))
+    print("debug_done.");exit()
+    anchor = make_anchor([terminal_shape[1], terminal_shape[2]], 
+                                                   size_list = anchor_size,
+                                                   asp_list = anchor_asp),
+                              
     batch_size = 64
     epoch_num = 100
     lr = 1e-2
