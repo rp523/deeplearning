@@ -2,7 +2,7 @@
 import os, sys, shutil
 import numpy as np
 import tensorflow as tf
-
+from transformer import *
 
 class ImageNetwork:
     def __init__(self, image_h, image_w, image_ch,
@@ -34,7 +34,8 @@ class ImageNetwork:
         self.__loss_dict = {}
         self.__label_dict = {}
         
-        self.__feed_dict = {}
+        self.__anchor = {}
+        self.__anchor_ph = {}
         
     def __get_padding_str(self, padding):
         assert(isinstance(padding, bool))
@@ -241,6 +242,12 @@ class ImageNetwork:
                            name = name)
         self.add_layer(new_layer)
     
+    def get_total_loss(self):
+        loss = tf.Variable(0.0, dtype = tf.float32)
+        for v in self.__loss_dict.values():
+            loss = tf.add(loss, v)
+        return loss
+    
     def add_loss(self, loss_type, name, input_name = None, gamma = None):
         pred_layer = self.get_input(input_name)
         label = tf.placeholder(dtype = tf.float32,
@@ -256,7 +263,7 @@ class ImageNetwork:
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
 
-    def add_rect_loss(self, name, gamma,
+    def add_rect_loss(self, name, gamma, size_list, asp_list,
                       cls_layer_name, reg_layer_name,
                       cls_label_name, reg_label_name):
         pred_cls = self.get_input(cls_layer_name)
@@ -271,7 +278,7 @@ class ImageNetwork:
                                    shape = [None, div_y, div_x, rect_ch]) # NOT one-hot
         label_reg = tf.placeholder(dtype = tf.float32,
                                    shape = [None, div_y, div_x, rect_ch, 4])
-        anchor    = tf.placeholder(dtype = tf.float32,
+        anchor_ph = tf.placeholder(dtype = tf.float32,
                                    shape = [None, div_y, div_x, rect_ch, 4])
         valid = (label_cls >= 0)
         # label
@@ -287,10 +294,10 @@ class ImageNetwork:
         pred_yc = 0.5 * (pred_reg[:,2] - pred_reg[:,0])
         pred_xc = 0.5 * (pred_reg[:,3] - pred_reg[:,1])
         # anchor
-        anchor_y0 = anchor[:,:,:,:,0]
-        anchor_x0 = anchor[:,:,:,:,1]
-        anchor_y1 = anchor[:,:,:,:,2]
-        anchor_x1 = anchor[:,:,:,:,3]
+        anchor_y0 = anchor_ph[:,:,:,:,0]
+        anchor_x0 = anchor_ph[:,:,:,:,1]
+        anchor_y1 = anchor_ph[:,:,:,:,2]
+        anchor_x1 = anchor_ph[:,:,:,:,3]
         anchor_h  = anchor_y1 - anchor_y0
         anchor_w  = anchor_x1 - anchor_x0
         anchor_yc = 0.5 * (anchor_y0 + anchor_y1)
@@ -326,9 +333,16 @@ class ImageNetwork:
         assert(not cls_label_name in self.__label_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
         self.__label_dict[cls_label_name] = label_cls
-        self.__feed_dict["anchor"] = anchor
-
-    def get_loss(self):
+        base_anchor = make_anchor([div_y, div_x], 
+                                  size_list = size_list,
+                                  asp_list = asp_list)
+        self.__anchor[reg_label_name] = base_anchor.reshape(div_y, div_x, len(size_list) * len(asp_list), 4)
+        self.__anchor_ph[reg_label_name] = anchor_ph
+    
+    def get_anchor(self, name):
+        return self.__anchor_ph[name], self.__anchor[name]
+    
+    def get_loss_dict(self):
         return self.__loss_dict
         
     '''        
@@ -339,24 +353,25 @@ class ImageNetwork:
             assert(0)
         return optimizer
     '''
-    def make_feed_dict(self, input_image, is_training, label_dict = None):
-
+    def create_feed_dict(self, input_image, is_training, label_dict = None):
+        
+        feed_dict = {}
         # input image
-        self.__feed_dict[self.__layer_list[0]] = input_image
+        feed_dict[self.__layer_list[0]] = input_image
         
         if label_dict is not None:
             for name, label in label_dict.items():
-                self.__feed_dict[self.__label_dict[name]] = label
+                feed_dict[self.__label_dict[name]] = label
         
         # for dropout
         if is_training is True:
             for dropout_idx in range(len(self.__dropout_ph_list)):
-                self.__feed_dict[self.__dropout_ph_list[dropout_idx]] = self.__dropout_val_list[dropout_idx]
+                feed_dict[self.__dropout_ph_list[dropout_idx]] = self.__dropout_val_list[dropout_idx]
         else:
             for dropout_idx in range(len(self.__dropout_ph_list)):
-                self.__feed_dict[self.__dropout_ph_list[dropout_idx]] = 1.0
+                feed_dict[self.__dropout_ph_list[dropout_idx]] = 1.0
         
-        return self.__feed_dict
+        return feed_dict
     
     # to be deleted
     def fit(self, train_x, train_y, valid_x, valid_y, loss_type, optimizer_type, learning_rate, epoch_num, batch_size, log_interval = 1):
