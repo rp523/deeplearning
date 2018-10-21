@@ -86,8 +86,14 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     label_table = label_vec + np.zeros((anchor.shape[0], label_vec.size)).astype(np.int32)
     anchor_label_val[is_pos_anchor] = label_table[np.arange(label_table.shape[0]), max_iou_label_idx][is_pos_anchor]
     anchor_label_val[is_neg_anchor] = 0
-
-    return anchor_label_val
+    
+    ret_anchor = np.zeros((anchor_label_val.size, label_rect_mat.shape[1])).astype(np.float32)
+    for i in range(anchor_label_val.size):
+        if is_pos_anchor[i]:
+            ret_anchor[i] = label_rect_mat[max_iou_label_idx[i]]
+    assert(ret_anchor.shape[0] == anchor_label_val.size)
+    assert(ret_anchor.shape[1] == 4)
+    return anchor_label_val, ret_anchor
 
 
 def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
@@ -190,7 +196,7 @@ def encode_anchor_label_test():
                                 label_rect_mat = rects,
                                 anchor = anchor,
                                 pos_iou_th = 0.5,
-                                neg_iou_th = 0.4)
+                                neg_iou_th = 0.4)[1]
             if (valid_label_vec > 0).any():
                 pil_img = Image.fromarray(rgb_arr.astype(np.uint8))
                 w, h = pil_img.size

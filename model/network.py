@@ -79,6 +79,13 @@ class ImageNetwork:
         layer = self.get_layer(name)
         print(layer.name, layer.get_shape())
         
+    def add_reshape(self, shape, name = None, input_name = None, dtype = None):
+        input_layer = self.get_input(input_name)
+        new_layer = tf.reshape(tensor = input_layer,
+                               shape = shape,
+                               name = name)
+        self.add_layer(new_layer)
+        
     def add_full_connect(self, output_ch, name = None, input_name = None, dtype = None):
         input_layer = self.get_input(input_name)
         input_ch = int(np.prod(input_layer.get_shape()[1:]))
@@ -116,7 +123,7 @@ class ImageNetwork:
         if name is not None:
             new_layer = tf.identity(new_layer, name = name)
         self.add_layer(new_layer)
-
+    
     class FilterParam:
         def __init__(self, kernel_y, kernel_x, stride_y, stride_x, padding):
             self.kernel_y = kernel_y
@@ -268,11 +275,11 @@ class ImageNetwork:
                       cls_label_name, reg_label_name):
         pred_cls = self.get_input(cls_layer_name)
         pred_reg = self.get_input(reg_layer_name)
-        pred_shape = pred_reg.get_shape().as_list()
+        pred_shape = pred_cls.get_shape().as_list()
         div_y = pred_shape[1]
         div_x = pred_shape[2]
-        rect_ch = pred_shape[3] // 4
-        cls_num = pred_reg.get_shape().as_list()[3] // rect_ch
+        rect_ch = pred_shape[3]
+        cls_num = pred_shape[4]
         
         label_cls = tf.placeholder(dtype = tf.int32,
                                    shape = [None, div_y, div_x, rect_ch]) # NOT one-hot
@@ -282,17 +289,16 @@ class ImageNetwork:
                                    shape = [None, div_y, div_x, rect_ch, 4])
         valid = (label_cls >= 0)
         # label
-        label_reg = tf.reshape(label_reg, [-1, 4])
-        label_h  = label_reg[:,2] - label_reg[:,0]
-        label_w  = label_reg[:,3] - label_reg[:,1]
-        label_yc = 0.5 * (label_reg[:,2] - label_reg[:,0])
-        label_xc = 0.5 * (label_reg[:,3] - label_reg[:,1])
+        label_h  = label_reg[:,:,:,:,2] - label_reg[:,:,:,:,0]
+        label_w  = label_reg[:,:,:,:,3] - label_reg[:,:,:,:,1]
+        label_yc = 0.5 * (label_reg[:,:,:,:,2] - label_reg[:,:,:,:,0])
+        label_xc = 0.5 * (label_reg[:,:,:,:,3] - label_reg[:,:,:,:,1])
         # pred
-        pred_reg = tf.reshape(pred_reg, [-1, 4])
-        pred_h  = pred_reg[:,2] - pred_reg[:,0]
-        pred_w  = pred_reg[:,3] - pred_reg[:,1]
-        pred_yc = 0.5 * (pred_reg[:,2] - pred_reg[:,0])
-        pred_xc = 0.5 * (pred_reg[:,3] - pred_reg[:,1])
+        pred_reg = tf.reshape(pred_reg, [-1, div_y, div_x, rect_ch, 4])
+        pred_h  = pred_reg[:,:,:,:,2] - pred_reg[:,:,:,:,0]
+        pred_w  = pred_reg[:,:,:,:,3] - pred_reg[:,:,:,:,1]
+        pred_yc = 0.5 * (pred_reg[:,:,:,:,2] - pred_reg[:,:,:,:,0])
+        pred_xc = 0.5 * (pred_reg[:,:,:,:,3] - pred_reg[:,:,:,:,1])
         # anchor
         anchor_y0 = anchor_ph[:,:,:,:,0]
         anchor_x0 = anchor_ph[:,:,:,:,1]

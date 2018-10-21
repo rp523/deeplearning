@@ -85,13 +85,23 @@ def focal_trial():
         for l in range(4 - 1 - 1):
             network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
         network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * (1 + len(tgt_words_list)), "relu")
+        network.add_reshape(shape = [-1,
+                                     int(network.get_input(None).get_shape().as_list()[1]),
+                                     int(network.get_input(None).get_shape().as_list()[2]),
+                                     anchor_size.size * anchor_asp.size,
+                                     1 + len(tgt_words_list)])
         network.add_softmax(name = "cls{}".format(i))
         # regression
         network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
         for l in range(4 - 1 - 1):
             network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * 4, "relu",
-                                       name = "reg{}".format(i))
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * 4, "relu")
+        network.add_reshape(shape = [-1,
+                                     network.get_input(None).get_shape().as_list()[1],
+                                     network.get_input(None).get_shape().as_list()[2],
+                                     anchor_size.size * anchor_asp.size,
+                                     4],
+                            name = "reg{}".format(i))
         network.add_rect_loss(name = "loss{}".format(i),
                               gamma = 2.0,
                               size_list = anchor_size,
@@ -119,8 +129,10 @@ def focal_trial():
             label_dict = {}
             for i in range(2, 5 + 1):
                 anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
-                label_dict["reg_label{}".format(i)] = #TODO
-                label_dict["cls_label{}".format(i)] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), 0.5, 0.4)
+                cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), 0.5, 0.4)
+                tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
+                label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
+                label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
             feed_dict = network.create_feed_dict(input_image = img_arr.reshape(-1, img_h, img_w, img_ch),
                                                  label_dict = label_dict,
                                                  is_training = True)
@@ -131,13 +143,11 @@ def focal_trial():
                                                       anchor.shape[1],
                                                       anchor.shape[2],
                                                       anchor.shape[3])
-            for k, v in feed_dict.items():
-                print(k)
             trainer.training(feed_dict = feed_dict)
             print("[epoch={e}/{et}][batch={b}/{bt}]".format(e = epoch,
                                                             et = epoch_num,
                                                             b = batch_cnt,
-                                                            bt = network.get_sample_num("train")))
+                                                            bt = bdd.get_sample_num("train")))
 
 if "__main__" == __name__:
     focal_trial()
