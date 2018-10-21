@@ -9,6 +9,30 @@ from model.network import ImageNetwork
 from transformer import *
 from trainer import Trainer
 
+
+def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th):
+    feed_dict = {}
+    
+    label_dict = {}
+    for i in range(2, 5 + 1):
+        anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
+        feed_dict[anchor_ph] = anchor.reshape(batch_size,
+                                              anchor.shape[0],
+                                              anchor.shape[1],
+                                              anchor.shape[2],
+                                              anchor.shape[3])
+
+        cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
+        tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
+        label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
+        label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
+    feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_arr.shape[0], img_arr.shape[1], img_arr.shape[2]),
+                                              label_dict = label_dict,
+                                              is_training = True))
+    
+    return feed_dict
+
+
 def focal_trial():
     
     tgt_words_list = [["car", "truck", "bus"], ["person", "rider"]]
@@ -110,6 +134,10 @@ def focal_trial():
                               reg_layer_name = "reg{}".format(i),
                               cls_label_name = "cls_label{}".format(i),
                               reg_label_name = "reg_label{}".format(i))
+    
+    
+    
+    
     batch_size = 1
     epoch_num = 100
     lr = 1e-5
@@ -120,7 +148,7 @@ def focal_trial():
     total_loss = network.get_total_loss()
     optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
     
-    train_type = "val"
+    train_type = "train"
     val_type = "val"
     
     with tf.Session() as sess:
@@ -128,34 +156,28 @@ def focal_trial():
     
         for epoch in range(epoch_num):
             batch_cnt = 0
-            for b in (range(bdd.get_sample_num(train_type) // batch_size)):
+            for b in range(bdd.get_sample_num(train_type) // batch_size):
                 batch_cnt += batch_size
                 
                 # one image
                 img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
-                feed_dict = {}
-                
-                label_dict = {}
-                for i in range(2, 5 + 1):
-                    anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
-                    feed_dict[anchor_ph] = anchor.reshape(batch_size,
-                                                          anchor.shape[0],
-                                                          anchor.shape[1],
-                                                          anchor.shape[2],
-                                                          anchor.shape[3])
-
-                    cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), 0.5, 0.4)
-                    tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
-                    label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
-                    label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
-                feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_h, img_w, img_ch),
-                                                          label_dict = label_dict,
-                                                          is_training = True))
-                sess.run(optimizer, feed_dict = feed_dict)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                sess.run(optimizer, feed_dict = learn_feed_dict)
                 print("[epoch={e}/{et}][batch={b}/{bt}]".format(e = epoch,
                                                                 et = epoch_num,
                                                                 b = batch_cnt,
                                                                 bt = bdd.get_sample_num(train_type)))
+                '''
+                if b % 1 == 0:
+                    val_loss = 0.0
+                    for val_idx in range(bdd.get_sample_num(val_type)):
+                        # one image
+                        img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
+                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                        one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
+                        val_loss = val_loss + one_loss
+                        print(val_idx, val_loss, val_loss)
+                '''
 
 if "__main__" == __name__:
     focal_trial()
