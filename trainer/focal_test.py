@@ -123,38 +123,39 @@ def focal_trial():
     train_type = "val"
     val_type = "val"
     
-    sess = tf.Session()
-    sess.run(tf.global_variables_initializer())
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+    
+        for epoch in range(epoch_num):
+            batch_cnt = 0
+            for b in (range(bdd.get_sample_num(train_type) // batch_size)):
+                batch_cnt += batch_size
+                
+                # one image
+                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
+                feed_dict = {}
+                
+                label_dict = {}
+                for i in range(2, 5 + 1):
+                    anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
+                    feed_dict[anchor_ph] = anchor.reshape(batch_size,
+                                                          anchor.shape[0],
+                                                          anchor.shape[1],
+                                                          anchor.shape[2],
+                                                          anchor.shape[3])
 
-    for epoch in range(epoch_num):
-        batch_cnt = 0
-        for b in (range(bdd.get_sample_num(train_type) // batch_size)):
-            batch_cnt += batch_size
-            
-            # one image
-            img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
-            label_dict = {}
-            for i in range(2, 5 + 1):
-                anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
-                cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), 0.5, 0.4)
-                tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
-                label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
-                label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
-            feed_dict = network.create_feed_dict(input_image = img_arr.reshape(-1, img_h, img_w, img_ch),
-                                                 label_dict = label_dict,
-                                                 is_training = True)
-            for i in range(2, 5 + 1):
-                anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
-                feed_dict[anchor_ph] = anchor.reshape(batch_size,
-                                                      anchor.shape[0],
-                                                      anchor.shape[1],
-                                                      anchor.shape[2],
-                                                      anchor.shape[3])
-            sess.run(optimizer, feed_dict = feed_dict)
-            print("[epoch={e}/{et}][batch={b}/{bt}]".format(e = epoch,
-                                                            et = epoch_num,
-                                                            b = batch_cnt,
-                                                            bt = bdd.get_sample_num(train_type)))
+                    cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), 0.5, 0.4)
+                    tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
+                    label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
+                    label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
+                feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_h, img_w, img_ch),
+                                                          label_dict = label_dict,
+                                                          is_training = True))
+                sess.run(optimizer, feed_dict = feed_dict)
+                print("[epoch={e}/{et}][batch={b}/{bt}]".format(e = epoch,
+                                                                et = epoch_num,
+                                                                b = batch_cnt,
+                                                                bt = bdd.get_sample_num(train_type)))
 
 if "__main__" == __name__:
     focal_trial()
