@@ -112,20 +112,27 @@ def focal_trial():
                               reg_label_name = "reg_label{}".format(i))
     batch_size = 1
     epoch_num = 100
+    lr = 1e-5
     
     bdd = BDD100k()
     bdd = BDD100k(resized_h = img_h,
                   resized_w = img_w)
     total_loss = network.get_total_loss()
-    trainer = Trainer(model = network,
-                      total_loss = total_loss,
-                      lr = 1e-5)
+    optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
     
+    train_type = "val"
+    val_type = "val"
+    
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+
     for epoch in range(epoch_num):
         batch_cnt = 0
-        for b in (range(bdd.get_sample_num("val") // batch_size)):
+        for b in (range(bdd.get_sample_num(train_type) // batch_size)):
             batch_cnt += batch_size
-            img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data("val", tgt_words_list)
+            
+            # one image
+            img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
             label_dict = {}
             for i in range(2, 5 + 1):
                 anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
@@ -143,11 +150,11 @@ def focal_trial():
                                                       anchor.shape[1],
                                                       anchor.shape[2],
                                                       anchor.shape[3])
-            trainer.training(feed_dict = feed_dict)
+            sess.run(optimizer, feed_dict = feed_dict)
             print("[epoch={e}/{et}][batch={b}/{bt}]".format(e = epoch,
                                                             et = epoch_num,
                                                             b = batch_cnt,
-                                                            bt = bdd.get_sample_num("train")))
+                                                            bt = bdd.get_sample_num(train_type)))
 
 if "__main__" == __name__:
     focal_trial()
