@@ -150,6 +150,8 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
+    if os.name == "nt":
+        train_type = "val"
     
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
