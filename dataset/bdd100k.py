@@ -86,20 +86,29 @@ class BDD100k(Dataset):
     def __update_list(self, data_type):
         assert((data_type == "train") or \
                (data_type == "val"  ) or \
-               (data_type == "test" ))
+               (data_type == "test"  ) or \
+               (data_type == "debug" ))
+        
+        max_num = None
+        if data_type == "debug":
+            max_num = 100
+            data_type = "val"
         if not data_type in self.__json_path_dict.keys():
             json_dir_path = os.path.join(self.__data_path, "labels", data_type)
             if os.path.exists(json_dir_path):
                 json_path_list_ = fileio.get_file_list(tgt_dir = json_dir_path,
-                                                       tgt_ext = ".json")
+                                                       tgt_ext = ".json",
+                                                       max_num = max_num)
             rgb_dir_path = os.path.join(self.__data_path, "images", data_type)
             if os.path.exists(rgb_dir_path):
                 rgb_path_list_ = fileio.get_file_list(tgt_dir = rgb_dir_path,
-                                                      tgt_ext = ".jpg")
+                                                      tgt_ext = ".jpg",
+                                                      max_num = max_num)
             area_dir_path = os.path.join(self.__data_path, "drivable_maps", data_type)
             if os.path.exists(area_dir_path):
                 area_path_list_ = fileio.get_file_list(tgt_dir = area_dir_path,
-                                                       tgt_ext = ".png")
+                                                       tgt_ext = ".png",
+                                                       max_num = max_num)
             assert(len(json_path_list_) > 0)
             assert(len(rgb_path_list_) > 0)
             assert(len(area_path_list_) > 0)
