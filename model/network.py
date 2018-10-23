@@ -283,27 +283,38 @@ class ImageNetwork:
         
         label_cls = tf.placeholder(dtype = tf.int32,
                                    shape = [None, div_y, div_x, rect_ch]) # NOT one-hot
+        assert(not cls_label_name in self.__label_dict.keys())
+        self.__label_dict[cls_label_name] = label_cls
         label_reg = tf.placeholder(dtype = tf.float32,
                                    shape = [None, div_y, div_x, rect_ch, 4])
+        assert(not reg_label_name in self.__label_dict.keys())
+        self.__label_dict[reg_label_name] = label_reg
         anchor_ph = tf.placeholder(dtype = tf.float32,
                                    shape = [None, div_y, div_x, rect_ch, 4])
-        valid = (label_cls >= 0)
-        # label
-        label_h  = label_reg[:,:,:,:,2] - label_reg[:,:,:,:,0]
-        label_w  = label_reg[:,:,:,:,3] - label_reg[:,:,:,:,1]
-        label_yc = 0.5 * (label_reg[:,:,:,:,2] - label_reg[:,:,:,:,0])
-        label_xc = 0.5 * (label_reg[:,:,:,:,3] - label_reg[:,:,:,:,1])
-        # pred
+        self.__anchor_ph[reg_label_name] = anchor_ph
+        
+        cls_valid = (label_cls >= 0)
+        reg_valid = (label_cls > 0)
+        label_reg = tf.boolean_mask(label_reg, reg_valid)
+        anchor_ph = tf.boolean_mask(anchor_ph, reg_valid)
         pred_reg = tf.reshape(pred_reg, [-1, div_y, div_x, rect_ch, 4])
-        pred_h  = pred_reg[:,:,:,:,2] - pred_reg[:,:,:,:,0]
-        pred_w  = pred_reg[:,:,:,:,3] - pred_reg[:,:,:,:,1]
-        pred_yc = 0.5 * (pred_reg[:,:,:,:,2] - pred_reg[:,:,:,:,0])
-        pred_xc = 0.5 * (pred_reg[:,:,:,:,3] - pred_reg[:,:,:,:,1])
+        pred_reg  = tf.boolean_mask(pred_reg, reg_valid)
+
+        # label
+        label_h  = label_reg[:,2] - label_reg[:,0]
+        label_w  = label_reg[:,3] - label_reg[:,1]
+        label_yc = 0.5 * (label_reg[:,2] - label_reg[:,0])
+        label_xc = 0.5 * (label_reg[:,3] - label_reg[:,1])
+        # pred
+        pred_ty = pred_reg[:,0]
+        pred_tx = pred_reg[:,1]
+        pred_th = pred_reg[:,2]
+        pred_tw = pred_reg[:,3]
         # anchor
-        anchor_y0 = anchor_ph[:,:,:,:,0]
-        anchor_x0 = anchor_ph[:,:,:,:,1]
-        anchor_y1 = anchor_ph[:,:,:,:,2]
-        anchor_x1 = anchor_ph[:,:,:,:,3]
+        anchor_y0 = anchor_ph[:,0]
+        anchor_x0 = anchor_ph[:,1]
+        anchor_y1 = anchor_ph[:,2]
+        anchor_x1 = anchor_ph[:,3]
         anchor_h  = anchor_y1 - anchor_y0
         anchor_w  = anchor_x1 - anchor_x0
         anchor_yc = 0.5 * (anchor_y0 + anchor_y1)
@@ -313,37 +324,29 @@ class ImageNetwork:
         label_tx = (label_xc - anchor_xc) / anchor_w
         label_h  = tf.log(label_h / anchor_h)
         label_w  = tf.log(label_w / anchor_w)
-        # pred-t
-        pred_ty = (pred_yc - anchor_yc) / anchor_h
-        pred_tx = (pred_xc - anchor_xc) / anchor_w
-        pred_h  = tf.log(pred_h / anchor_h)
-        pred_w  = tf.log(pred_w / anchor_w)
         # loss
-        loss_ty = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_ty - label_ty), valid))
-        loss_tx = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_tx - label_tx), valid))
-        loss_h  = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_h  - label_h ), valid))
-        loss_w  = tf.reduce_sum(tf.boolean_mask(tf.abs(pred_w  - label_w ), valid))
+        loss_ty = tf.reduce_mean((tf.abs(pred_ty - label_ty)))
+        loss_tx = tf.reduce_mean((tf.abs(pred_tx - label_tx)))
+        loss_h  = tf.reduce_mean((tf.abs(pred_th  - label_h )))
+        loss_w  = tf.reduce_mean((tf.abs(pred_tw  - label_w )))
         reg_loss = loss_ty + loss_tx + loss_h + loss_w
         
         assert(not reg_label_name in self.__loss_dict.keys())
-        assert(not reg_label_name in self.__label_dict.keys())
         self.__loss_dict[reg_label_name]  = reg_loss
-        self.__label_dict[reg_label_name] = label_reg
+        
         
         label_cls_onehot = tf.one_hot(label_cls, depth = cls_num)
         pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
         cls_loss_vec = (- (      label_cls_onehot) * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
                         - (1.0 - label_cls_onehot) * ((      pred_cls) ** gamma) * tf.log((1.0 - pred_cls) + 1e-5))
-        cls_loss = tf.reduce_mean(tf.boolean_mask(cls_loss_vec, valid))
+        cls_loss = tf.reduce_mean(tf.boolean_mask(cls_loss_vec, cls_valid))
         assert(not label_cls_onehot in self.__loss_dict.keys())
-        assert(not cls_label_name in self.__label_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
-        self.__label_dict[cls_label_name] = label_cls
         base_anchor = make_anchor([div_y, div_x], 
                                   size_list = size_list,
                                   asp_list = asp_list)
         self.__anchor[reg_label_name] = base_anchor.reshape(div_y, div_x, len(size_list) * len(asp_list), 4)
-        self.__anchor_ph[reg_label_name] = anchor_ph
+        
     
     def get_anchor(self, name):
         return self.__anchor_ph[name], self.__anchor[name]

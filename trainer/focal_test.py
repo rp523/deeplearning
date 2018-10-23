@@ -163,12 +163,13 @@ def focal_trial():
                 img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                 sess.run(optimizer, feed_dict = learn_feed_dict)
-                print("[epoch={e}/{et}][batch={b}/{bt}]".format(e = epoch,
-                                                                et = epoch_num,
-                                                                b = batch_cnt,
-                                                                bt = bdd.get_sample_num(train_type)))
-                '''
-                if b % 1 == 0:
+                print("[epoch={e}/{et}][batch={b}/{bt}]loss={loss}".format( \
+                    e = epoch,
+                    et = epoch_num,
+                    b = batch_cnt,
+                    bt = bdd.get_sample_num(train_type),
+                    loss = sess.run(total_loss, feed_dict = learn_feed_dict)))
+                if 0:#b % 1 == 0:
                     val_loss = 0.0
                     for val_idx in range(bdd.get_sample_num(val_type)):
                         # one image
@@ -176,8 +177,7 @@ def focal_trial():
                         eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                         one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                         val_loss = val_loss + one_loss
-                        print(val_idx, val_loss, val_loss)
-                '''
+                        print(val_idx, one_loss, val_loss)
 
 if "__main__" == __name__:
     focal_trial()
