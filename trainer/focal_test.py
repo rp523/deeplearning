@@ -38,8 +38,8 @@ def focal_trial():
     tgt_words_list = [["car", "truck", "bus"], ["person", "rider"]]
     anchor_size = 2.0 ** np.arange(0.0, 1.0, 0.25)
     anchor_asp  = np.linspace(0.5, 2.0, 3)
-    img_h  = 128
-    img_w  = 256
+    img_h  = 256
+    img_w  = img_h * 2
     img_ch = 3
     
     tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
@@ -166,6 +166,14 @@ def focal_trial():
                 rect_labels = np.empty(0)
                 while rect_labels.size == 0:
                     img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
+                '''
+                from PIL import Image, ImageDraw
+                pil = Image.fromarray(img_arr.astype(np.uint8))
+                drw = ImageDraw.Draw(pil)
+                for rect in rects:
+                    drw.rectangle((rect[1] * img_w, rect[0] * img_h, rect[3] * img_w, rect[2] * img_h), outline = (255,0,0))
+                pil.show();exit()
+                '''
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 endtime = time.time()
