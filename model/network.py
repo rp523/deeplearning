@@ -37,6 +37,8 @@ class ImageNetwork:
         self.__anchor = {}
         self.__anchor_ph = {}
         
+        self.debug = []
+        
     def __get_padding_str(self, padding):
         assert(isinstance(padding, bool))
         if padding:
@@ -329,8 +331,11 @@ class ImageNetwork:
         loss_tx = tf.reduce_mean((tf.abs(pred_tx - label_tx)))
         loss_h  = tf.reduce_mean((tf.abs(pred_th  - label_h )))
         loss_w  = tf.reduce_mean((tf.abs(pred_tw  - label_w )))
-        reg_loss = loss_ty + loss_tx + loss_h + loss_w
-        
+        zero = tf.constant(0.0)
+        reg_loss = tf.cond(tf.is_nan(loss_ty), lambda: zero, lambda: loss_ty)    \
+                 + tf.cond(tf.is_nan(loss_tx), lambda: zero, lambda: loss_tx)    \
+                 + tf.cond(tf.is_nan(loss_h ), lambda: zero, lambda: loss_h )    \
+                 + tf.cond(tf.is_nan(loss_w ), lambda: zero, lambda: loss_w )
         assert(not reg_label_name in self.__loss_dict.keys())
         self.__loss_dict[reg_label_name]  = reg_loss
         
