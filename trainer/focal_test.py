@@ -151,7 +151,7 @@ def focal_trial():
     train_type = "train"
     val_type = "val"
     if os.name == "nt":
-        train_type = "val"
+        train_type = "debug"
     
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -163,7 +163,9 @@ def focal_trial():
                 
                 starttime = time.time()
                 # one image
-                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
+                rect_labels = np.empty(0)
+                while rect_labels.size == 0:
+                    img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 endtime = time.time()

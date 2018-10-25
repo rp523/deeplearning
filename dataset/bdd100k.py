@@ -102,13 +102,11 @@ class BDD100k(Dataset):
             rgb_dir_path = os.path.join(self.__data_path, "images", data_type)
             if os.path.exists(rgb_dir_path):
                 rgb_path_list_ = fileio.get_file_list(tgt_dir = rgb_dir_path,
-                                                      tgt_ext = ".jpg",
-                                                      max_num = max_num)
+                                                      tgt_ext = ".jpg")
             area_dir_path = os.path.join(self.__data_path, "drivable_maps", data_type)
             if os.path.exists(area_dir_path):
                 area_path_list_ = fileio.get_file_list(tgt_dir = area_dir_path,
-                                                       tgt_ext = ".png",
-                                                       max_num = max_num)
+                                                       tgt_ext = ".png")
             assert(len(json_path_list_) > 0)
             assert(len(rgb_path_list_) > 0)
             assert(len(area_path_list_) > 0)
@@ -149,9 +147,10 @@ class BDD100k(Dataset):
             self.__rgb_path_dict[data_type]  = rgb_path_list
             self.__json_path_dict[data_type] = json_path_list
             self.__area_path_dict[data_type] = area_path_list
+        return data_type
     
     def get_sample_num(self, data_type):
-        self.__update_list(data_type)
+        data_type = self.__update_list(data_type)
         return len(self.__rgb_path_dict[data_type])
     
     def get_seg_sample_num(self, data_type):
@@ -244,7 +243,7 @@ class BDD100k(Dataset):
         return sum_img
 
     def get_vertices_data(self, data_type, tgt_words_list = None, index = None):
-        self.__update_list(data_type)
+        data_type = self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
         
