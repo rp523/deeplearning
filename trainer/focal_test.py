@@ -50,9 +50,16 @@ def focal_trial():
                            image_w  = img_w,
                            image_ch = img_ch)
     
-    # conv1_x
-    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(7, 7, 2, 2, True), 32, "relu", name = "e1_1")
+    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(7, 7, 2, 2, True), 32, "relu")
+    
+    layer = network.get_input(name = None)
+    while layer.get_shape().as_list()[1] > (2 ** 5):
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 2, 2, True), 64, "relu")
+        layer = network.get_input(name = None)
 
+    # conv1_x
+    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 2, 2, True), 32, "relu", name = "e1_1")
+    
     # conv2_x
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 2, 2, True), 64, "relu")
     for i in range(3):
@@ -136,8 +143,6 @@ def focal_trial():
                               reg_label_name = "reg_label{}".format(i))
     
     
-    
-    
     batch_size = 1
     epoch_num = 100
     lr = 1e-5
@@ -177,24 +182,27 @@ def focal_trial():
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 endtime = time.time()
-                log = "[epoch={e}/{et}][batch={b}/{bt}]({time})loss={loss}".format(
+                log = "[epoch={e}/{et}][batch={b}/{bt}]({time})".format(
                     e = epoch,
                     et = epoch_num,
                     b = batch_cnt,
                     bt = bdd.get_sample_num(train_type),
-                    time = "{:.2f}sec".format(endtime - starttime),
-                    loss = sess.run(total_loss, feed_dict = learn_feed_dict))
+                    time = "{:.2f}sec".format(endtime - starttime))
+                #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
                 print(log)
                 #open("log.txt", "a").write(log + "\n")
-                if 0:#b % 1 == 0:
-                    val_loss = 0.0
-                    for val_idx in range(bdd.get_sample_num(val_type)):
-                        # one image
-                        img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
-                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
-                        one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
-                        val_loss = val_loss + one_loss
-                        print(val_idx, one_loss, val_loss)
-
+            starttime = time.time()
+            val_loss = 0.0
+            for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
+                # one image
+                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
+                eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
+                val_loss = val_loss + one_loss
+            endtime = time.time()
+            val_log = "loss={}".format(val_loss) + "," + "{:2f}sec".format(endtime-starttime)
+            print(val_log)
+            open("eval_log.txt", "a").write(val_log + "\n")
+            
 if "__main__" == __name__:
     focal_trial()
