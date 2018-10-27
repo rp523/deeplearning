@@ -263,14 +263,16 @@ def focal_trial():
                                                                     anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
                                                                     size_list = anchor_size,
                                                                     asp_list = anchor_asp,
-                                                                    thresh = 0.5)
+                                                                    thresh = 0.6)
                         for j in range(cls.size):
                             draw.rectangle((rect[j][1] * img_w,
                                             rect[j][0] * img_h,
                                             rect[j][3] * img_w,
                                             rect[j][2] * img_h),
                                             outline = pal[cls[j] - 1])
-                            draw.text((rect[j][1] * img_w, rect[j][0] * img_h), "{:.2f}".format(score[j]))
+                            draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                      text = "{:.2f}".format(score[j]),
+                                      fill = pal[cls[j] - 1])
                     dst_dir = "result"
                     if not os.path.exists(dst_dir):
                         os.makedirs(dst_dir)

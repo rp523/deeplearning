@@ -38,9 +38,7 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     assert(label_vec.size == label_rect_mat.shape[0])
     assert(label_rect_mat.shape[1] == 4)
     assert(anchor.shape[1] == 4)
-    reg_label = np.empty(anchor.shape).astype(np.float32)
-    cls_label = -1 * np.ones(np.prod(anchor.shape[:2])).astype(np.int32)
-
+    
     label_h = label_rect_mat[:,2] - label_rect_mat[:,0]
     label_w = label_rect_mat[:,3] - label_rect_mat[:,1]
     label_area = label_h * label_w
@@ -55,8 +53,6 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     for i in range(label_vec.size):
         label_rect = label_rect_mat[i]
         assert(label_rect.size == 4)
-        assert((label_rect[2] - label_rect[0]).all())
-        assert((label_rect[3] - label_rect[1]).all())
         # 着目ラベル矩形に対し、アンカー矩形が重なっているかどうか
         is_overlap = np.bitwise_and(np.bitwise_and(label_rect[0] < anchor[:,2], label_rect[2] > anchor[:,0]),
                                     np.bitwise_and(label_rect[1] < anchor[:,3], label_rect[3] > anchor[:,1]))

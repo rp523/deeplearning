@@ -342,8 +342,7 @@ class ImageNetwork:
         
         label_cls_onehot = tf.one_hot(label_cls, depth = cls_num)
         pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
-        cls_loss_vec = (- (      label_cls_onehot) * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
-                        - (1.0 - label_cls_onehot) * ((      pred_cls) ** gamma) * tf.log((1.0 - pred_cls) + 1e-5))
+        cls_loss_vec = - label_cls_onehot * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
         cls_loss = tf.reduce_mean(tf.boolean_mask(cls_loss_vec, cls_valid))
         assert(not label_cls_onehot in self.__loss_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
