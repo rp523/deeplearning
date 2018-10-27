@@ -91,7 +91,7 @@ class BDD100k(Dataset):
         
         max_num = None
         if data_type == "debug":
-            max_num = 100
+            max_num = 10
             data_type = "val"
         if not data_type in self.__json_path_dict.keys():
             json_dir_path = os.path.join(self.__data_path, "labels", data_type)

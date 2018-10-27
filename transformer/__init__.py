@@ -97,8 +97,8 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
 
 def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
                              thresh = 0.5):
-    assert((anchor_cls.shape[-4:-2] == anchor_reg_t.shape[-4:-2]).all())
-    base_anchor = make_anchor(anchor_cls[-4:-4+2],
+    assert((anchor_cls.shape[-4:-2] == anchor_reg_t.shape[-4:-2]))
+    base_anchor = make_anchor(anchor_cls.shape[-4:-4+2],
                               size_list,
                               asp_list)
     base_anchor = base_anchor.reshape(-1, 4)
@@ -131,8 +131,10 @@ def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
     pred_rect  = np.append(pred_pos0, pred_pos1, axis = 1)
     
     is_pos = np.max(anchor_cls, axis = -1) > thresh
+    print(np.sum(is_pos) / is_pos.size)
     pos_cls = np.argmax(anchor_cls, axis = -1)[is_pos]
-    return pos_cls, pred_rect[is_pos.flatten()]
+    pos_score = np.max(anchor_cls, axis = -1)[is_pos]
+    return pos_cls, pos_score, pred_rect[is_pos.flatten()]
 
 def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     # まずasp=1.0, size=1.0で作る

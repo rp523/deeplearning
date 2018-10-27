@@ -9,6 +9,7 @@ from model.network import ImageNetwork
 from transformer import *
 from trainer import Trainer
 import time
+from PIL import Image, ImageDraw
 
 def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th):
     feed_dict = {}
@@ -155,7 +156,7 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
-    if os.name == "nt":
+    if 1:#os.name == "nt":
         train_type = "debug"
     
     with tf.Session() as sess:
@@ -199,8 +200,35 @@ def focal_trial():
                 eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                 one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                 val_loss = val_loss + one_loss
+                
+                # output prediction image
+                pal = []
+                pal.append((0,0,255))
+                pal.append((255,0,0))
+                pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                draw = ImageDraw.Draw(pil_img)
+                for i in range(2, 5 + 1):
+                    cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
+                                                                anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
+                                                                size_list = anchor_size,
+                                                                asp_list = anchor_asp,
+                                                                thresh = 0.8)
+                    for j in range(cls.size):
+                        draw.rectangle((rect[j][1] * img_w,
+                                        rect[j][0] * img_h,
+                                        rect[j][3] * img_w,
+                                        rect[j][2] * img_h),
+                                        outline = pal[cls[j] - 1])
+                        draw.text((rect[j][1] * img_w, rect[j][0] * img_h), "{:.2f}".format(score[j]))
+                dst_dir = os.path.join("result", "epoch{}".format(epoch))
+                if not os.path.exists(dst_dir):
+                    os.makedirs(dst_dir)
+                dst_name = "{}.png".format(val_idx)
+                dst_path = os.path.join(dst_dir, dst_name)
+                pil_img.save(dst_path)
+                
             endtime = time.time()
-            val_log = "loss={}".format(val_loss) + "," + "{:2f}sec".format(endtime-starttime)
+            val_log = "loss={}".format(val_loss) + "," + "{:.2f}sec".format(endtime-starttime)
             print(val_log)
             open("eval_log.txt", "a").write(val_log + "\n")
             
