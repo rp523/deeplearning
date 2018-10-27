@@ -95,6 +95,44 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     assert(ret_anchor.shape[1] == 4)
     return anchor_label_val, ret_anchor
 
+def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
+                             thresh = 0.5):
+    assert((anchor_cls.shape[-4:-2] == anchor_reg_t.shape[-4:-2]).all())
+    base_anchor = make_anchor(anchor_cls[-4:-4+2],
+                              size_list,
+                              asp_list)
+    base_anchor = base_anchor.reshape(-1, 4)
+    anchor_y0 = base_anchor[:,0]
+    anchor_x0 = base_anchor[:,1]
+    anchor_y1 = base_anchor[:,2]
+    anchor_x1 = base_anchor[:,3]
+    anchor_yc = 0.5 * (anchor_y0 + anchor_y1)
+    anchor_xc = 0.5 * (anchor_x0 + anchor_x1)
+    anchor_h  = 0.5 * (anchor_y1 - anchor_y0)
+    anchor_w  = 0.5 * (anchor_x1 + anchor_x0)
+    assert((anchor_h > 0.0).all())
+    assert((anchor_w > 0.0).all())
+    
+    pred_t = anchor_reg_t.reshape(-1, 4)
+    pred_ty = pred_t[:,0]
+    pred_tx = pred_t[:,1]
+    pred_th = pred_t[:,2]
+    pred_tw = pred_t[:,3]
+    pred_h  = anchor_h * np.exp(pred_th)
+    pred_w  = anchor_w * np.exp(pred_tw)
+    pred_yc = anchor_yc + anchor_h * pred_ty
+    pred_xc = anchor_xc + anchor_w * pred_tx
+    pred_y0 = pred_yc - 0.5 * pred_h
+    pred_x0 = pred_xc - 0.5 * pred_w
+    pred_y1 = pred_yc + 0.5 * pred_h
+    pred_x1 = pred_xc + 0.5 * pred_w
+    pred_pos0 = np.append(pred_y0.reshape(-1, 1), pred_x0.reshape(-1, 1), axis = 1)
+    pred_pos1 = np.append(pred_y1.reshape(-1, 1), pred_x1.reshape(-1, 1), axis = 1)
+    pred_rect  = np.append(pred_pos0, pred_pos1, axis = 1)
+    
+    is_pos = np.max(anchor_cls, axis = -1) > thresh
+    pos_cls = np.argmax(anchor_cls, axis = -1)[is_pos]
+    return pos_cls, pred_rect[is_pos.flatten()]
 
 def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     # まずasp=1.0, size=1.0で作る
