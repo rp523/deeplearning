@@ -109,7 +109,7 @@ def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
     anchor_yc = 0.5 * (anchor_y0 + anchor_y1)
     anchor_xc = 0.5 * (anchor_x0 + anchor_x1)
     anchor_h  = 0.5 * (anchor_y1 - anchor_y0)
-    anchor_w  = 0.5 * (anchor_x1 + anchor_x0)
+    anchor_w  = 0.5 * (anchor_x1 - anchor_x0)
     assert((anchor_h > 0.0).all())
     assert((anchor_w > 0.0).all())
     
@@ -131,7 +131,6 @@ def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
     pred_rect  = np.append(pred_pos0, pred_pos1, axis = 1)
     
     is_pos = np.max(anchor_cls, axis = -1) > thresh
-    print(np.sum(is_pos) / is_pos.size)
     pos_cls = np.argmax(anchor_cls, axis = -1)[is_pos]
     pos_score = np.max(anchor_cls, axis = -1)[is_pos]
     return pos_cls, pos_score, pred_rect[is_pos.flatten()]
@@ -146,43 +145,39 @@ def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     y1 = y[1 :]
     x0 = x[:-1]
     x1 = x[1 :]
-    base_rect_mat = np.empty((anchor_div_y, anchor_div_x, 4)).astype(np.float32)
-    base_rect_mat[:,:,0] = y0.reshape(-1, 1)
-    base_rect_mat[:,:,1] = x0.reshape( 1,-1)
-    base_rect_mat[:,:,2] = y1.reshape(-1, 1)
-    base_rect_mat[:,:,3] = x1.reshape( 1,-1)
-    base_rect_mat = base_rect_mat.reshape(-1, 4)
-    assert(base_rect_mat.ndim == 2)
-    assert(base_rect_mat.shape[1] == 4)
-    center = base_rect_mat.reshape(-1, 2, 2).mean(axis = -2)
-            
-    anchors = np.empty((len(size_list), len(asp_list), anchor_div_y * anchor_div_x, 4)).astype(np.float32)
+    yc = 0.5 * (y0 + y1)
+    xc = 0.5 * (x0 + x1)
+    base_h  = (y1 - y0)
+    base_w  = (x1 - x0)
+    assert((base_h > 0.0).all())
+    assert((base_w > 0.0).all())
+    anchors = np.empty((anchor_div_y, anchor_div_x, len(size_list), len(asp_list), 4)).astype(np.float32)
     for s in range(len(size_list)):
         for a in range(len(asp_list)):
-            h = np.abs(base_rect_mat[:,2] - base_rect_mat[:,0]) * size_list[s] / np.sqrt(asp_list[a])
-            w = np.abs(base_rect_mat[:,3] - base_rect_mat[:,1]) * size_list[s] * np.sqrt(asp_list[a])
-            anchors[s, a, :, 0] = center[:,0] - 0.5 * h 
-            anchors[s, a, :, 1] = center[:,1] - 0.5 * w 
-            anchors[s, a, :, 2] = center[:,0] + 0.5 * h 
-            anchors[s, a, :, 3] = center[:,1] + 0.5 * w
+            h = base_h * size_list[s] / np.sqrt(asp_list[a])
+            w = base_w * size_list[s] * np.sqrt(asp_list[a])
+            anchors[:, :, s, a, 0] = yc.reshape(-1, 1) - 0.5 * h.reshape(-1, 1)
+            anchors[:, :, s, a, 1] = xc.reshape( 1,-1) - 0.5 * w.reshape( 1,-1)
+            anchors[:, :, s, a, 2] = yc.reshape(-1, 1) + 0.5 * h.reshape(-1, 1) 
+            anchors[:, :, s, a, 3] = xc.reshape( 1,-1) + 0.5 * w.reshape( 1,-1)
     anchors[anchors <= 0.0] = 0.0
     anchors[anchors >= 1.0] = 1.0
     assert((anchors <= 1.0).all())
     assert((anchors >= 0.0).all())
-    assert(anchors.ndim == 4)
-    assert(anchors.shape[3] == 4)
+    assert(anchors.ndim == 5)
+    assert(anchors.shape[-1] == 4)
     return anchors.reshape(-1, 4)
 
 def make_anchor_test():
-    img_h, img_w = 900, 1500
+    img_h, img_w = 800, 1600
     img_arr = np.zeros((img_h, img_w)).astype(np.uint8)
     from PIL import Image, ImageDraw
     pil_img = Image.fromarray(img_arr)
     draw = ImageDraw.Draw(pil_img)
-    size_list = [2.0**0.0, 2.0**0.25, 2.0**0.50, 2.0**0.75]
-    asp_list = [0.5, 1.0, 1.5]
+    size_list = [1.0]#[2.0**0.0, 2.0**0.25, 2.0**0.50, 2.0**0.75]
+    asp_list = [0.5, 1.0, 2.0]
     div_y = 10
-    div_x = 10
+    div_x = 20
     anchor = make_anchor([div_y, div_x], size_list, asp_list)
     print(anchor.shape)
     n = 0
@@ -263,4 +258,4 @@ def encode_anchor_label_test():
                 exit()
         print("no hit " + str(n))
 if __name__ == "__main__":
-    encode_anchor_label_test()
+    make_anchor_test()

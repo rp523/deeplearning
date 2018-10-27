@@ -145,7 +145,7 @@ def focal_trial():
     
     
     batch_size = 1
-    epoch_num = 100
+    epoch_num = 10000
     lr = 1e-5
     
     bdd = BDD100k()
@@ -172,15 +172,64 @@ def focal_trial():
                 rect_labels = np.empty(0)
                 while rect_labels.size == 0:
                     img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
-                '''
-                from PIL import Image, ImageDraw
-                pil = Image.fromarray(img_arr.astype(np.uint8))
-                drw = ImageDraw.Draw(pil)
-                for rect in rects:
-                    drw.rectangle((rect[1] * img_w, rect[0] * img_h, rect[3] * img_w, rect[2] * img_h), outline = (255,0,0))
-                pil.show();exit()
-                '''
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                
+                if 0:
+                    # visualize annotation rect
+                    pil = Image.fromarray(img_arr.astype(np.uint8))
+                    drw = ImageDraw.Draw(pil)
+                    for rect in rects:
+                        drw.rectangle((rect[1] * img_w,
+                                       rect[0] * img_h,
+                                       rect[3] * img_w,
+                                       rect[2] * img_h),
+                                      outline = (255,0,0))
+                    pil.show()
+                    #exit()
+                
+                if 0:
+                    pal = []
+                    pal.append((0,0,255))
+                    pal.append((255,0,0))
+                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_img)
+                    # visualize anchored label
+                    for i in range(2, 5 + 1):
+                        cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(i)], feed_dict = learn_feed_dict)
+                        reg = make_anchor(network.get_layer("reg{}".format(i)).get_shape().as_list()[1:1+2], size_list = anchor_size, asp_list = anchor_asp)
+                        cls = cls.flatten()
+                        reg = reg[cls > 0]
+                        cls = cls[cls > 0]
+                        for j in range(cls.size):
+                            draw.rectangle((reg[j][1] * img_w,
+                                            reg[j][0] * img_h,
+                                            reg[j][3] * img_w,
+                                            reg[j][2] * img_h),
+                                            outline = pal[cls[j] - 1])
+                    pil_img.show()
+                    exit()
+
+                if 0:
+                    pal = []
+                    pal.append((0,0,255))
+                    pal.append((255,0,0))
+                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_img)
+                    # visualize anchored label
+                    for i in range(2, 5 + 1):
+                        cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(i)], feed_dict = learn_feed_dict)
+                        reg = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(i)], feed_dict = learn_feed_dict)
+                        reg = reg[cls > 0]
+                        cls = cls[cls > 0]
+                        for j in range(cls.size):
+                            draw.rectangle((reg[j][1] * img_w,
+                                            reg[j][0] * img_h,
+                                            reg[j][3] * img_w,
+                                            reg[j][2] * img_h),
+                                            outline = pal[cls[j] - 1])
+                    pil_img.show()
+                    exit()
+
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 endtime = time.time()
                 log = "[epoch={e}/{et}][batch={b}/{bt}]({time})".format(
@@ -192,45 +241,47 @@ def focal_trial():
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
                 print(log)
                 #open("log.txt", "a").write(log + "\n")
-            starttime = time.time()
-            val_loss = 0.0
-            for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
-                # one image
-                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
-                eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
-                one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
-                val_loss = val_loss + one_loss
-                
-                # output prediction image
-                pal = []
-                pal.append((0,0,255))
-                pal.append((255,0,0))
-                pil_img = Image.fromarray(img_arr.astype(np.uint8))
-                draw = ImageDraw.Draw(pil_img)
-                for i in range(2, 5 + 1):
-                    cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
-                                                                anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
-                                                                size_list = anchor_size,
-                                                                asp_list = anchor_asp,
-                                                                thresh = 0.8)
-                    for j in range(cls.size):
-                        draw.rectangle((rect[j][1] * img_w,
-                                        rect[j][0] * img_h,
-                                        rect[j][3] * img_w,
-                                        rect[j][2] * img_h),
-                                        outline = pal[cls[j] - 1])
-                        draw.text((rect[j][1] * img_w, rect[j][0] * img_h), "{:.2f}".format(score[j]))
-                dst_dir = os.path.join("result", "epoch{}".format(epoch))
-                if not os.path.exists(dst_dir):
-                    os.makedirs(dst_dir)
-                dst_name = "{}.png".format(val_idx)
-                dst_path = os.path.join(dst_dir, dst_name)
-                pil_img.save(dst_path)
-                
-            endtime = time.time()
-            val_log = "loss={}".format(val_loss) + "," + "{:.2f}sec".format(endtime-starttime)
-            print(val_log)
-            open("eval_log.txt", "a").write(val_log + "\n")
+            
+            if epoch % 100 == 0:
+                starttime = time.time()
+                val_loss = 0.0
+                for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
+                    # one image
+                    img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
+                    eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                    one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
+                    val_loss = val_loss + one_loss
+                    
+                    # output prediction image
+                    pal = []
+                    pal.append((0,0,255))
+                    pal.append((255,0,0))
+                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_img)
+                    for i in range(2, 5 + 1):
+                        cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
+                                                                    anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
+                                                                    size_list = anchor_size,
+                                                                    asp_list = anchor_asp,
+                                                                    thresh = 0.5)
+                        for j in range(cls.size):
+                            draw.rectangle((rect[j][1] * img_w,
+                                            rect[j][0] * img_h,
+                                            rect[j][3] * img_w,
+                                            rect[j][2] * img_h),
+                                            outline = pal[cls[j] - 1])
+                            draw.text((rect[j][1] * img_w, rect[j][0] * img_h), "{:.2f}".format(score[j]))
+                    dst_dir = "result"
+                    if not os.path.exists(dst_dir):
+                        os.makedirs(dst_dir)
+                    dst_name = "epoch{0:08d}_img{0:05d}.png".format(epoch, val_idx)
+                    dst_path = os.path.join(dst_dir, dst_name)
+                    pil_img.save(dst_path)
+                    
+                endtime = time.time()
+                val_log = "loss={}".format(val_loss) + "," + "{:.2f}sec".format(endtime-starttime)
+                print(val_log)
+                open("eval_log.txt", "a").write(val_log + "\n")
             
 if "__main__" == __name__:
     focal_trial()
