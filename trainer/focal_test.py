@@ -133,7 +133,7 @@ def focal_trial():
                                      network.get_input(None).get_shape().as_list()[2],
                                      anchor_size.size * anchor_asp.size,
                                      4],
-                            name = "reg{}".format(i))
+                                     name = "reg{}".format(i))
         network.add_rect_loss(name = "loss{}".format(i),
                               gamma = 2.0,
                               size_list = anchor_size,
@@ -145,7 +145,7 @@ def focal_trial():
     
     
     batch_size = 1
-    epoch_num = 10000
+    epoch_num = 10
     lr = 1e-5
     
     bdd = BDD100k()
@@ -156,7 +156,7 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
-    if 1:#os.name == "nt":
+    if os.name == "nt":
         train_type = "debug"
     
     with tf.Session() as sess:
@@ -239,10 +239,11 @@ def focal_trial():
                     bt = bdd.get_sample_num(train_type),
                     time = "{:.2f}sec".format(endtime - starttime))
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
-                print(log)
+                if b % 100 == 0:
+                    print(log)
                 #open("log.txt", "a").write(log + "\n")
             
-            if epoch % 100 == 0:
+            if (epoch % 1 == 0) and (epoch > 0):
                 starttime = time.time()
                 val_loss = 0.0
                 for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
@@ -276,7 +277,7 @@ def focal_trial():
                     dst_dir = "result"
                     if not os.path.exists(dst_dir):
                         os.makedirs(dst_dir)
-                    dst_name = "epoch{0:08d}_img{0:05d}.png".format(epoch, val_idx)
+                    dst_name = "epoch{0:08d}".format(epoch) + "_img{0:05d}.png".format(val_idx)
                     dst_path = os.path.join(dst_dir, dst_name)
                     pil_img.save(dst_path)
                     
