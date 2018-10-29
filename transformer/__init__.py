@@ -31,10 +31,9 @@ def transform_one_hot(label_vec, class_num):
 
 # anchor情報へ変換
 def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_th):
-    anchor_label_val = -1 * np.ones(anchor.shape[0]).astype(np.int32)
+    # negative anchorで初期化
+    anchor_label_val = np.zeros(anchor.shape[0]).astype(np.int32)
     
-    if label_vec.shape[0] <= 0:
-        return
     assert(label_vec.size == label_rect_mat.shape[0])
     assert(label_rect_mat.shape[1] == 4)
     assert(anchor.shape[1] == 4)
@@ -73,15 +72,16 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
 
     max_iou_label_idx = np.argmax(iou_mat, axis = 1)
     assert(max_iou_label_idx.shape[0] == anchor.shape[0])
-    is_pos_anchor = np.max(iou_mat, axis = 1) > pos_iou_th
-    is_neg_anchor = np.max(iou_mat, axis = 1) < neg_iou_th
+    max_iou = np.max(iou_mat, axis = 1)
+    is_pos_anchor = max_iou > pos_iou_th
+    is_inv_anchor = np.bitwise_and(max_iou > neg_iou_th, max_iou <= pos_iou_th)
     assert(is_pos_anchor.ndim == 1)
-    assert(is_neg_anchor.ndim == 1)
+    assert(is_inv_anchor.ndim == 1)
     assert(is_pos_anchor.size == anchor.shape[0])
-    assert(is_neg_anchor.size == anchor.shape[0])
+    assert(is_inv_anchor.size == anchor.shape[0])
     label_table = label_vec + np.zeros((anchor.shape[0], label_vec.size)).astype(np.int32)
     anchor_label_val[is_pos_anchor] = label_table[np.arange(label_table.shape[0]), max_iou_label_idx][is_pos_anchor]
-    anchor_label_val[is_neg_anchor] = 0
+    anchor_label_val[is_inv_anchor] = -1
     
     ret_anchor = np.zeros((anchor_label_val.size, label_rect_mat.shape[1])).astype(np.float32)
     for i in range(anchor_label_val.size):

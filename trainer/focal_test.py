@@ -36,7 +36,6 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg
 
 def focal_trial():
     
-    tgt_words_list = [["car", "truck", "bus"], ["person", "rider"]]
     anchor_size = 2.0 ** np.arange(0.0, 1.0, 0.25)
     anchor_asp  = np.linspace(0.5, 2.0, 3)
     img_h  = 256
@@ -145,7 +144,7 @@ def focal_trial():
     
     
     batch_size = 1
-    epoch_num = 10
+    epoch_num = 100
     lr = 1e-5
     
     bdd = BDD100k()
@@ -154,7 +153,7 @@ def focal_trial():
     total_loss = network.get_total_loss()
     optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
     
-    train_type = "train"
+    train_type = "val"
     val_type = "val"
     if os.name == "nt":
         train_type = "debug"
@@ -264,16 +263,17 @@ def focal_trial():
                                                                     anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
                                                                     size_list = anchor_size,
                                                                     asp_list = anchor_asp,
-                                                                    thresh = 0.6)
+                                                                    thresh = 0.5)
                         for j in range(cls.size):
-                            draw.rectangle((rect[j][1] * img_w,
-                                            rect[j][0] * img_h,
-                                            rect[j][3] * img_w,
-                                            rect[j][2] * img_h),
-                                            outline = pal[cls[j] - 1])
-                            draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
-                                      text = "{:.2f}".format(score[j]),
-                                      fill = pal[cls[j] - 1])
+                            if cls[j] != 0:
+                                draw.rectangle((rect[j][1] * img_w,
+                                                rect[j][0] * img_h,
+                                                rect[j][3] * img_w,
+                                                rect[j][2] * img_h),
+                                                outline = pal[cls[j] - 1])
+                                draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                          text = "{:.2f}".format(score[j]),
+                                          fill = pal[cls[j] - 1])
                     dst_dir = "result"
                     if not os.path.exists(dst_dir):
                         os.makedirs(dst_dir)
