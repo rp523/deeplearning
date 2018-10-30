@@ -186,10 +186,11 @@ def focal_trial():
         saver = tf.train.Saver()
         
         # restore
-        restore_path = "."#"r"result_20181030_224248\model\epoch0001_batch3"
-        ckpt = tf.train.get_checkpoint_state(restore_path)
-        if ckpt:
-            saver.restore(sess, ckpt.model_checkpoint_path)
+        restore_path = None#"r"result_20181030_224248\model\epoch0001_batch3"
+        if restore_path:
+            ckpt = tf.train.get_checkpoint_state(restore_path)
+            if ckpt:
+                saver.restore(sess, ckpt.model_checkpoint_path)
         
         for epoch in range(epoch_num):
             batch_cnt = 0
@@ -259,8 +260,7 @@ def focal_trial():
 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
-                
-                if b % 1000 == 0 and (epoch > 0) and (b > 0):
+                if b % 99 == 0 and (epoch > 0) and (b > 0):
                     # make folder
                     dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
                     if not os.path.exists(dst_pred_dir):
