@@ -242,10 +242,12 @@ class BDD100k(Dataset):
                        font = font)
         return sum_img
 
-    def get_vertices_data(self, data_type, tgt_words_list = None, index = None):
+    def get_vertices_data(self, data_type, tgt_words_list = None, index = None, flip = None):
         data_type = self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
+        if index is None:
+            flip = np.random.randint(2).astype(np.bool)
         
         json_path = self.__json_path_dict[data_type][index]
 
@@ -279,7 +281,7 @@ class BDD100k(Dataset):
                     polygon = np.array(obj["poly2d"][0]["vertices"]).reshape(-1, 2)
                     if polygon.shape[0] >= 3:
                         polygon = polygon / np.array([self.__rgb_w, self.__rgb_h])
-                        polygon = polygon.flatten()
+                        #polygon = polygon.flatten()
                         polygons.append(polygon)
                     poly_labels = np.append(poly_labels, label_value)
     
@@ -291,6 +293,13 @@ class BDD100k(Dataset):
         rgb_pil = rgb_pil.resize((self.__resized_w, self.__resized_h))
         rgb_arr = np.asarray(rgb_pil)
         
+        if flip is True:
+            rgb_arr = rgb_arr[:,::-1,:]
+            rects[:,1] = 1.0 - rects[:,1]
+            rects[:,3] = 1.0 - rects[:,3]
+            for polygon in polygons:
+                polygon[:,0] = 1.0 - polygon[:,0]
+            
         if 0: #debug view
             self.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).show()
             exit()
@@ -428,9 +437,9 @@ def make_vertices_summary_img(data_type, tgt_labels):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
     for i in tqdm(range(b.get_sample_num(data_type))):
-        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i)
+        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = True)
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 if __name__ == "__main__":
-    make_vertices_summary_img("val", [["car", "truck", "bus"], ["person", "rider"]])
+    make_vertices_summary_img("debug", [["car", "truck", "bus"], ["person", "rider"]])
     print("Done.")
