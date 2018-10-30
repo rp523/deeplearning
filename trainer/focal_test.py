@@ -144,7 +144,7 @@ def focal_trial():
     
     
     batch_size = 1
-    epoch_num = 100
+    epoch_num = 1000
     lr = 1e-5
     
     bdd = BDD100k()
@@ -163,14 +163,12 @@ def focal_trial():
     
         for epoch in range(epoch_num):
             batch_cnt = 0
-            for b in range(bdd.get_sample_num(train_type) // batch_size):
+            for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
                 batch_cnt += batch_size
                 
-                starttime = time.time()
                 # one image
                 rect_labels = np.empty(0)
-                while rect_labels.size == 0:
-                    img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
+                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
                 
                 if 0:
@@ -230,19 +228,9 @@ def focal_trial():
                     exit()
 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
-                endtime = time.time()
-                log = "[epoch={e}/{et}][batch={b}/{bt}]({time})".format(
-                    e = epoch,
-                    et = epoch_num,
-                    b = batch_cnt,
-                    bt = bdd.get_sample_num(train_type),
-                    time = "{:.2f}sec".format(endtime - starttime))
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
-                if b % 100 == 0:
-                    print(log)
-                #open("log.txt", "a").write(log + "\n")
-            
-            if (epoch % 1 == 0) and (epoch > 0):
+                
+            if (epoch % 10 == 0) and (epoch > 0):
                 starttime = time.time()
                 val_loss = 0.0
                 for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
@@ -274,10 +262,10 @@ def focal_trial():
                                 draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
                                           text = "{:.2f}".format(score[j]),
                                           fill = pal[cls[j] - 1])
-                    dst_dir = "result"
+                    dst_dir = os.path.join("result", "epoch{0:04d}".format(epoch))
                     if not os.path.exists(dst_dir):
                         os.makedirs(dst_dir)
-                    dst_name = "epoch{0:08d}".format(epoch) + "_img{0:05d}.png".format(val_idx)
+                    dst_name = "img{0:05d}.png".format(val_idx)
                     dst_path = os.path.join(dst_dir, dst_name)
                     pil_img.save(dst_path)
                     
