@@ -10,6 +10,7 @@ from transformer import *
 from trainer import Trainer
 import time
 from PIL import Image, ImageDraw
+from datetime import datetime
 
 def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th):
     feed_dict = {}
@@ -147,7 +148,6 @@ def focal_trial():
     epoch_num = 1000
     lr = 1e-5
     
-    bdd = BDD100k()
     bdd = BDD100k(resized_h = img_h,
                   resized_w = img_w)
     total_loss = network.get_total_loss()
@@ -157,10 +157,20 @@ def focal_trial():
     val_type = "val"
     if os.name == "nt":
         train_type = "debug"
+    result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+    pred_dir = os.path.join(result_dir, "pred_img")
+    model_dir = os.path.join(result_dir, "model")
     
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-    
+        saver = tf.train.Saver()
+        
+        # restore
+        restore_path = r"result_20181030_224248\model\epoch0001_batch3"
+        ckpt = tf.train.get_checkpoint_state(restore_path)
+        if ckpt:
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        
         for epoch in range(epoch_num):
             batch_cnt = 0
             for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
@@ -230,49 +240,57 @@ def focal_trial():
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
                 
-            if (epoch % 10 == 0) and (epoch > 0):
-                starttime = time.time()
-                val_loss = 0.0
-                for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
-                    # one image
-                    img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
-                    eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
-                    one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
-                    val_loss = val_loss + one_loss
+                if b % 2 == 0 and (epoch > 0) and (b > 0):
+                    # make folder
+                    dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
+                    if not os.path.exists(dst_pred_dir):
+                        os.makedirs(dst_pred_dir)
                     
-                    # output prediction image
-                    pal = []
-                    pal.append((0,0,255))
-                    pal.append((255,0,0))
-                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
-                    draw = ImageDraw.Draw(pil_img)
-                    for i in range(2, 5 + 1):
-                        cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
-                                                                    anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
-                                                                    size_list = anchor_size,
-                                                                    asp_list = anchor_asp,
-                                                                    thresh = 0.5)
-                        for j in range(cls.size):
-                            if cls[j] != 0:
-                                draw.rectangle((rect[j][1] * img_w,
-                                                rect[j][0] * img_h,
-                                                rect[j][3] * img_w,
-                                                rect[j][2] * img_h),
-                                                outline = pal[cls[j] - 1])
-                                draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
-                                          text = "{:.2f}".format(score[j]),
-                                          fill = pal[cls[j] - 1])
-                    dst_dir = os.path.join("result", "epoch{0:04d}".format(epoch))
-                    if not os.path.exists(dst_dir):
-                        os.makedirs(dst_dir)
-                    dst_name = "img{0:05d}.png".format(val_idx)
-                    dst_path = os.path.join(dst_dir, dst_name)
-                    pil_img.save(dst_path)
+                    starttime = time.time()
+                    val_loss = 0.0
+                    for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
+                        # one image
+                        img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
+                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                        one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
+                        val_loss = val_loss + one_loss
+                        
+                        # output prediction image
+                        pal = []
+                        pal.append((0,0,255))
+                        pal.append((255,0,0))
+                        pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                        draw = ImageDraw.Draw(pil_img)
+                        for i in range(2, 5 + 1):
+                            cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
+                                                                        anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
+                                                                        size_list = anchor_size,
+                                                                        asp_list = anchor_asp,
+                                                                        thresh = 0.5)
+                            for j in range(cls.size):
+                                if cls[j] != 0:
+                                    draw.rectangle((rect[j][1] * img_w,
+                                                    rect[j][0] * img_h,
+                                                    rect[j][3] * img_w,
+                                                    rect[j][2] * img_h),
+                                                    outline = pal[cls[j] - 1])
+                                    draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                              text = "{:.2f}".format(score[j]),
+                                              fill = pal[cls[j] - 1])
+                        dst_name = "img{0:05d}.png".format(val_idx)
+                        dst_path = os.path.join(dst_pred_dir, dst_name)
+                        pil_img.save(dst_path)
+                        
+                    endtime = time.time()
+                    val_txt = "epoch:{0:04d}".format(epoch) + "_batch{0:06d}".format(batch_cnt) + "loss={}".format(val_loss) + "," + "{:.2f}sec".format(endtime-starttime)
+                    val_path = os.path.join(result_dir, "eval_log.txt")
+                    open(val_path, "a").write(val_txt + "\n")
                     
-                endtime = time.time()
-                val_log = "loss={}".format(val_loss) + "," + "{:.2f}sec".format(endtime-starttime)
-                print(val_log)
-                open("eval_log.txt", "a").write(val_log + "\n")
-            
+                    # Save model
+                    dst_model_dir = os.path.join(model_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
+                    if not os.path.exists(dst_model_dir):
+                        os.makedirs(dst_model_dir)
+                    dst_model_path = os.path.join(dst_model_dir, "model.ckpt")
+                    saver.save(sess, dst_model_path)
 if "__main__" == __name__:
     focal_trial()
