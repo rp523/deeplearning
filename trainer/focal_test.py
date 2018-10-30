@@ -12,7 +12,7 @@ import time
 from PIL import Image, ImageDraw
 from datetime import datetime
 
-def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th):
+def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th, cls_freq):
     feed_dict = {}
     
     label_dict = {}
@@ -30,14 +30,26 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg
         label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
     feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_arr.shape[0], img_arr.shape[1], img_arr.shape[2]),
                                               label_dict = label_dict,
-                                              is_training = True))
+                                              is_training = True,
+                                              cls_freq = cls_freq))
     
     return feed_dict
 
+def calc_class_freq(network, bdd, dat_type, tgt_words_list, reg_label_name_list, pos_th, neg_th):
+    cls_num = len(tgt_words_list) + 1
+    cnt = np.zeros(cls_num).astype(np.uint32)
+    for b in tqdm(range(bdd.get_sample_num(dat_type))):
+        _0, rect_labels, rects, _1, _2 = bdd.get_vertices_data(dat_type, tgt_words_list, index = b)
+        for reg_label_name in reg_label_name_list:
+            _, anchor = network.get_anchor(reg_label_name)
+            cls, _ = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
+            for c in range(cnt.size):
+                cnt[c] = cnt[c] + np.sum(cls == c)
+    return cnt / np.sum(cnt)
 
 def focal_trial():
     
-    anchor_size = 2.0 ** np.arange(0.0, 1.0, 0.25)
+    anchor_size = 1.0 / (2.0 ** np.arange(0.0, 1.0, 0.25))
     anchor_asp  = np.linspace(0.5, 2.0, 3)
     img_h  = 256
     img_w  = img_h * 2
@@ -147,13 +159,15 @@ def focal_trial():
     batch_size = 1
     epoch_num = 1000
     lr = 1e-5
+    pos_th = 0.5
+    neg_th = 0.4
     
     bdd = BDD100k(resized_h = img_h,
                   resized_w = img_w)
     total_loss = network.get_total_loss()
     optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
     
-    train_type = "val"
+    train_type = "train"
     val_type = "val"
     if os.name == "nt":
         train_type = "debug"
@@ -161,12 +175,18 @@ def focal_trial():
     pred_dir = os.path.join(result_dir, "pred_img")
     model_dir = os.path.join(result_dir, "model")
     
+    # クラス比を計算
+    reg_label_name_list = []
+    for i in range(2, 5 + 1):
+        reg_label_name_list.append("reg_label{}".format(i))
+    cls_freq = calc_class_freq(network, bdd, train_type, tgt_words_list, reg_label_name_list, pos_th, neg_th)
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         
         # restore
-        restore_path = r"result_20181030_224248\model\epoch0001_batch3"
+        restore_path = "."#"r"result_20181030_224248\model\epoch0001_batch3"
         ckpt = tf.train.get_checkpoint_state(restore_path)
         if ckpt:
             saver.restore(sess, ckpt.model_checkpoint_path)
@@ -179,7 +199,7 @@ def focal_trial():
                 # one image
                 rect_labels = np.empty(0)
                 img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
                 
                 if 0:
                     # visualize annotation rect
@@ -240,7 +260,7 @@ def focal_trial():
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
                 
-                if b % 2 == 0 and (epoch > 0) and (b > 0):
+                if b % 1000 == 0 and (epoch > 0) and (b > 0):
                     # make folder
                     dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
                     if not os.path.exists(dst_pred_dir):
@@ -251,7 +271,7 @@ def focal_trial():
                     for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
                         # one image
                         img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
-                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = 0.5, neg_th = 0.4)
+                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
                         one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                         val_loss = val_loss + one_loss
                         

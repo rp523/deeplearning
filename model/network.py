@@ -33,6 +33,7 @@ class ImageNetwork:
         # loss, label
         self.__loss_dict = {}
         self.__label_dict = {}
+        self.__cls_weight = []
         
         self.__anchor = {}
         self.__anchor_ph = {}
@@ -294,8 +295,11 @@ class ImageNetwork:
         anchor_ph = tf.placeholder(dtype = tf.float32,
                                    shape = [None, div_y, div_x, rect_ch, 4])
         self.__anchor_ph[reg_label_name] = anchor_ph
+        cls_weight = tf.placeholder(dtype = tf.float32,
+                                    shape = [cls_num])
+        self.__cls_weight.append(cls_weight)
         
-        cls_valid = (label_cls >= 0)
+        #cls_valid = (label_cls >= 0)
         reg_valid = (label_cls > 0)
         label_reg = tf.boolean_mask(label_reg, reg_valid)
         anchor_ph = tf.boolean_mask(anchor_ph, reg_valid)
@@ -342,8 +346,9 @@ class ImageNetwork:
         
         label_cls_onehot = tf.one_hot(label_cls, depth = cls_num)
         pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
-        cls_loss_vec = - label_cls_onehot * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
-        cls_loss = tf.reduce_mean(tf.boolean_mask(cls_loss_vec, cls_valid))
+        cls_loss_onehot = - label_cls_onehot * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
+        cls_loss_vec = tf.reduce_sum(cls_loss_onehot, axis = [0,1,2,3])
+        cls_loss = tf.reduce_sum(cls_loss_vec * cls_weight) / tf.reduce_sum(tf.cast(label_cls > 0, tf.float32))
         assert(not label_cls_onehot in self.__loss_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
         base_anchor = make_anchor([div_y, div_x], 
@@ -366,7 +371,7 @@ class ImageNetwork:
             assert(0)
         return optimizer
     '''
-    def create_feed_dict(self, input_image, is_training, label_dict = None):
+    def create_feed_dict(self, input_image, is_training, label_dict = None, cls_freq = None):
         
         feed_dict = {}
         # input image
@@ -375,6 +380,10 @@ class ImageNetwork:
         if label_dict is not None:
             for name, label in label_dict.items():
                 feed_dict[self.__label_dict[name]] = label
+        
+        if len(cls_freq) != 0:
+            for cls_weight in self.__cls_weight:
+                feed_dict[cls_weight] = (1.0 / cls_freq) / np.sum(1.0 / cls_freq)
         
         # for dropout
         if is_training is True:
