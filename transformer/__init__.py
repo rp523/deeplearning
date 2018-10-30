@@ -38,6 +38,10 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     assert(label_rect_mat.shape[1] == 4)
     assert(anchor.shape[1] == 4)
     
+    # ground truthにひもづかなかった場合
+    if label_vec.size == 0:
+        return anchor_label_val, anchor
+    
     label_h = label_rect_mat[:,2] - label_rect_mat[:,0]
     label_w = label_rect_mat[:,3] - label_rect_mat[:,1]
     label_area = label_h * label_w
