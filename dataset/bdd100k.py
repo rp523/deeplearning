@@ -275,15 +275,17 @@ class BDD100k(Dataset):
                     x1 = box_dict["x2"] / self.__rgb_w
                     y0 = box_dict["y1"] / self.__rgb_h
                     y1 = box_dict["y2"] / self.__rgb_h
+                    assert(x0 <= x1)
+                    assert(y0 <= y1)
                     rects = np.append(rects, np.array([y0, x0, y1, x1]).reshape(1, 4), axis = 0)
                     rect_labels = np.append(rect_labels, label_value)
                 elif "poly2d" in obj.keys():
                     polygon = np.array(obj["poly2d"][0]["vertices"]).reshape(-1, 2)
                     if polygon.shape[0] >= 3:
-                        polygon = polygon / np.array([self.__rgb_w, self.__rgb_h])
-                        #polygon = polygon.flatten()
+                        polygon = polygon[:,::-1]   # 順番をx,yからy,xに変更
+                        polygon = polygon / np.array([self.__rgb_h, self.__rgb_w])
                         polygons.append(polygon)
-                    poly_labels = np.append(poly_labels, label_value)
+                        poly_labels = np.append(poly_labels, label_value)
     
         rect_labels = super().convert_label_org_val(rect_labels, tgt_words_list)
         
@@ -295,11 +297,9 @@ class BDD100k(Dataset):
         
         if flip is True:
             rgb_arr = rgb_arr[:,::-1,:]
-            rects[:,1] = 1.0 - rects[:,1]
-            rects[:,3] = 1.0 - rects[:,3]
-            for polygon in polygons:
-                polygon[:,0] = 1.0 - polygon[:,0]
-            
+            rects[:,[1, 3]] = 1.0 - rects[:,[3, 1]]
+            for i in range(len(polygons)):
+                polygons[i][:,1] = 1.0 - polygons[i][:,1]
         if 0: #debug view
             self.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).show()
             exit()
@@ -307,16 +307,14 @@ class BDD100k(Dataset):
         return rgb_arr, rect_labels, rects, poly_labels, polygons
     
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
-        font_path = r"C:\Windows\Fonts\Myrica.TTC"
-        font_size = 16
-        font = ImageFont.truetype(font_path, font_size)
         red   = (255,   0,   0, 128)
         blue  = (  0,   0, 255,  64)
         white = (255, 255, 255, 255)
 
         rgb_img = Image.fromarray(rgb_arr)
-        draw = ImageDraw.Draw(rgb_img, "RGBA")
         dw, dh = rgb_img.size
+        draw = ImageDraw.Draw(rgb_img, "RGBA")
+        fontheight = draw.getfont().getsize(' ')[1]
         for i in range(rects.shape[0]):
             rect = rects[i]
             y0 = (rect[0] * dh)
@@ -327,21 +325,19 @@ class BDD100k(Dataset):
             for k, v in self.label_dict.items():
                 if v == rect_labels[i]:
                     draw.text([max(0, min(dw - 1, x0)),
-                               max(0, min(dh - 1, y0 - font_size))],
+                               max(0, min(dh - 1, y0 - fontheight))],
                                k,
-                               fill = red,
-                               font = font)
+                               fill = red)
                     break
         for i in range(len(polygons)):
-            polygon = (polygons[i].reshape(-1, 2) * [dw , dh])
+            polygon = (polygons[i] * np.array([dh , dw]))[:,::-1]
             draw.polygon(polygon.flatten().tolist(), fill = blue)
             for k, v in self.label_dict.items():
                 if v == poly_labels[i]:
                     draw.text([max(0, min(dw - 1, np.average(polygon[:, 0]))),
-                               max(0, min(dh - 1, np.average(polygon[:, 1])) - font_size)],
+                               max(0, min(dh - 1, np.average(polygon[:, 1])) - fontheight)],
                                k,
-                               fill = white,
-                               font = font)
+                               fill = white)
                     break
         #rgb_img.show()
         return rgb_img
@@ -436,10 +432,18 @@ def make_vertices_summary_img(data_type, tgt_labels):
     print("writing " + dst_dir)
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
+
+    for i in tqdm(range(b.get_sample_num(data_type))):
+        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = False)
+        b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
+            os.path.join(dst_dir, "{0:06d}.png".format(i)))
     for i in tqdm(range(b.get_sample_num(data_type))):
         rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = True)
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
-            os.path.join(dst_dir, "{0:06d}.png".format(i)))
+            os.path.join(dst_dir, "{0:06d}_flip.png".format(i)))
+        
 if __name__ == "__main__":
-    make_vertices_summary_img("debug", [["car", "truck", "bus"], ["person", "rider"]])
+    tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+                  ["person", "rider"]]
+    make_vertices_summary_img("debug", tgt_words_list)
     print("Done.")
