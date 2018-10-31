@@ -187,10 +187,12 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
-    pcname = subprocess.getoutput("uname -n")
-    if (pcname == "isgsktyktt-VJS111") or \
-       (pcname == "Yusuke-PC"):
-        train_type = "debug"
+    if 1:
+        # 軽量化
+        pcname = subprocess.getoutput("uname -n")
+        if (pcname == "isgsktyktt-VJS111") or \
+           (pcname == "Yusuke-PC"):
+            train_type = "debug"
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     pred_dir = os.path.join(result_dir, "pred_img")
     model_dir = os.path.join(result_dir, "model")
