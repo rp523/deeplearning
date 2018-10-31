@@ -348,7 +348,15 @@ class ImageNetwork:
         pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
         cls_loss_onehot = - label_cls_onehot * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
         cls_loss_vec = tf.reduce_sum(cls_loss_onehot, axis = [0,1,2,3])
-        cls_loss = tf.reduce_sum(cls_loss_vec * cls_weight) / tf.reduce_sum(tf.cast(label_cls > 0, tf.float32))
+        cls_loss = tf.reduce_sum(cls_loss_vec * cls_weight)
+        '''
+        focal loss論文に準拠するならば、easy-negativeは実質的にロスがないためポジティブなanchorの数で正規化すべき。
+        ただ実際には画像内にポジティブ画像が全く無い場合も学習の対象としたいので、その場合は
+        ポジ／ネガすべてのアンカー数で正規化する。その場合、ゼロ割はほとんど無いはずだが一応対策しておく。
+        '''
+        norm = tf.reduce_sum(tf.cast(label_cls > 0, tf.float32))
+        neg_norm = tf.reduce_sum(tf.cast(label_cls >= 0, tf.float32))
+        cls_loss = tf.cond(norm > 0.0, lambda: cls_loss / norm, lambda: tf.cond(neg_norm > 0.0, lambda: cls_loss / neg_norm, lambda: zero))
         assert(not label_cls_onehot in self.__loss_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
         base_anchor = make_anchor([div_y, div_x], 
