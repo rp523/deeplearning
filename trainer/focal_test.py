@@ -49,8 +49,10 @@ def calc_class_freq(network, bdd, dat_type, tgt_words_list, reg_label_name_list,
 
 def focal_trial():
     
-    anchor_size = 1.0 / (2.0 ** np.arange(0.0, 1.0, 0.25))
+    anchor_size = 2.0 ** np.arange(0.0, 1.0, 0.5)
     anchor_asp  = np.linspace(0.5, 2.0, 3)
+    anchor_offset_x = np.arange(0.0, 1.0, 0.5)
+    anchor_offset_y = np.arange(0.0, 1.0, 0.5)
     img_h  = 256
     img_w  = img_h * 2
     img_ch = 3
@@ -183,6 +185,34 @@ def focal_trial():
         reg_label_name_list.append("reg_label{}".format(i))
     cls_freq = calc_class_freq(network, bdd, train_type, tgt_words_list, reg_label_name_list, pos_th, neg_th)
 
+    if 1:
+        pal = []
+        pal.append((0,0,255))
+        pal.append((255,0,0))
+        dst_dir = "assigned_anchor"
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+        with tf.Session() as sess:
+            for i in tqdm(range(bdd.get_sample_num(train_type))):
+                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = i)
+                pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                draw = ImageDraw.Draw(pil_img)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
+                # visualize anchored label
+                for l in range(2, 5 + 1):
+                    cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
+                    reg = make_anchor(network.get_layer("reg{}".format(l)).get_shape().as_list()[1:1+2], size_list = anchor_size, asp_list = anchor_asp)
+                    cls = cls.flatten()
+                    reg = reg[cls > 0]
+                    cls = cls[cls > 0]
+                    for j in range(cls.size):
+                        draw.rectangle((reg[j][1] * img_w,
+                                        reg[j][0] * img_h,
+                                        reg[j][3] * img_w,
+                                        reg[j][2] * img_h),
+                                        outline = pal[cls[j] - 1])
+                pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
+        exit()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
@@ -217,27 +247,6 @@ def focal_trial():
                     pil.show()
                     exit()
                 
-                if 0:
-                    pal = []
-                    pal.append((0,0,255))
-                    pal.append((255,0,0))
-                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
-                    draw = ImageDraw.Draw(pil_img)
-                    # visualize anchored label
-                    for i in range(2, 5 + 1):
-                        cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(i)], feed_dict = learn_feed_dict)
-                        reg = make_anchor(network.get_layer("reg{}".format(i)).get_shape().as_list()[1:1+2], size_list = anchor_size, asp_list = anchor_asp)
-                        cls = cls.flatten()
-                        reg = reg[cls > 0]
-                        cls = cls[cls > 0]
-                        for j in range(cls.size):
-                            draw.rectangle((reg[j][1] * img_w,
-                                            reg[j][0] * img_h,
-                                            reg[j][3] * img_w,
-                                            reg[j][2] * img_h),
-                                            outline = pal[cls[j] - 1])
-                    pil_img.show()
-                    exit()
 
                 if 0:
                     pal = []
