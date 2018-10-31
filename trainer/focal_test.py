@@ -49,10 +49,10 @@ def calc_class_freq(network, bdd, dat_type, tgt_words_list, reg_label_name_list,
 
 def focal_trial():
     
-    anchor_size = 2.0 ** np.arange(0.0, 1.0, 0.5)
+    anchor_size = 2.0 ** (np.arange(0, 2) / 2)
     anchor_asp  = np.linspace(0.5, 2.0, 3)
-    anchor_offset_x = np.arange(0.0, 1.0, 0.5)
-    anchor_offset_y = np.arange(0.0, 1.0, 0.5)
+    anchor_offset_y = np.arange(0, 3) / 3
+    anchor_offset_x = np.arange(0, 3) / 3
     img_h  = 256
     img_w  = img_h * 2
     img_ch = 3
@@ -130,28 +130,44 @@ def focal_trial():
         network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
         for l in range(4 - 1 - 1):
             network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * (1 + len(tgt_words_list)), "relu")
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size *
+                                                                                   anchor_asp.size *
+                                                                                   anchor_offset_y.size *
+                                                                                   anchor_offset_x.size *
+                                                                                   (1 + len(tgt_words_list)), "relu")
         network.add_reshape(shape = [-1,
                                      int(network.get_input(None).get_shape().as_list()[1]),
                                      int(network.get_input(None).get_shape().as_list()[2]),
-                                     anchor_size.size * anchor_asp.size,
+                                     anchor_size.size *
+                                     anchor_asp.size *
+                                     anchor_offset_y.size *
+                                     anchor_offset_x.size,
                                      1 + len(tgt_words_list)])
         network.add_softmax(name = "cls{}".format(i))
         # regression
         network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
         for l in range(4 - 1 - 1):
             network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size * anchor_asp.size * 4, "relu")
+        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size *
+                                                                                   anchor_asp.size *
+                                                                                   anchor_offset_y.size *
+                                                                                   anchor_offset_x.size * 4,
+                                                                                   "relu")
         network.add_reshape(shape = [-1,
                                      network.get_input(None).get_shape().as_list()[1],
                                      network.get_input(None).get_shape().as_list()[2],
-                                     anchor_size.size * anchor_asp.size,
+                                     anchor_size.size *
+                                     anchor_asp.size *
+                                     anchor_offset_y.size *
+                                     anchor_offset_x.size,
                                      4],
                                      name = "reg{}".format(i))
         network.add_rect_loss(name = "loss{}".format(i),
                               gamma = 2.0,
                               size_list = anchor_size,
                               asp_list = anchor_asp,
+                              offset_y_list = anchor_offset_y,
+                              offset_x_list = anchor_offset_x,
                               cls_layer_name = "cls{}".format(i),
                               reg_layer_name = "reg{}".format(i),
                               cls_label_name = "cls_label{}".format(i),
@@ -185,7 +201,7 @@ def focal_trial():
         reg_label_name_list.append("reg_label{}".format(i))
     cls_freq = calc_class_freq(network, bdd, train_type, tgt_words_list, reg_label_name_list, pos_th, neg_th)
 
-    if 1:
+    if 0:
         pal = []
         pal.append((0,0,255))
         pal.append((255,0,0))
@@ -201,7 +217,11 @@ def focal_trial():
                 # visualize anchored label
                 for l in range(2, 5 + 1):
                     cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
-                    reg = make_anchor(network.get_layer("reg{}".format(l)).get_shape().as_list()[1:1+2], size_list = anchor_size, asp_list = anchor_asp)
+                    reg = make_anchor(network.get_layer("reg{}".format(l)).get_shape().as_list()[1:1+2],
+                                      size_list = anchor_size,
+                                      asp_list = anchor_asp,
+                                      offset_y_list = anchor_offset_y,
+                                      offset_x_list = anchor_offset_x)
                     cls = cls.flatten()
                     reg = reg[cls > 0]
                     cls = cls[cls > 0]
@@ -271,7 +291,7 @@ def focal_trial():
 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                if b % 99 == 0 and (epoch > 0) and (b > 0):
+                if b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0 and (epoch > 0) and (b > 0):
                     # make folder
                     dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
                     if not os.path.exists(dst_pred_dir):
@@ -297,6 +317,8 @@ def focal_trial():
                                                                         anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
                                                                         size_list = anchor_size,
                                                                         asp_list = anchor_asp,
+                                                                        offset_y_list = anchor_offset_y,
+                                                                        offset_x_list = anchor_offset_x,
                                                                         thresh = 0.5)
                             for j in range(cls.size):
                                 if cls[j] != 0:

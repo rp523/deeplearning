@@ -95,12 +95,15 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     assert(ret_anchor.shape[1] == 4)
     return anchor_label_val, ret_anchor
 
-def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
+def decode_anchor_prediction(anchor_cls, anchor_reg_t,
+                             offset_y_list, offset_x_list, size_list, asp_list,
                              thresh = 0.5):
     assert((anchor_cls.shape[-4:-2] == anchor_reg_t.shape[-4:-2]))
     base_anchor = make_anchor(anchor_cls.shape[-4:-4+2],
-                              size_list,
-                              asp_list)
+                              offset_y_list = offset_y_list,
+                              offset_x_list = offset_x_list,
+                              size_list = size_list,
+                              asp_list = asp_list)
     base_anchor = base_anchor.reshape(-1, 4)
     anchor_y0 = base_anchor[:,0]
     anchor_x0 = base_anchor[:,1]
@@ -135,7 +138,11 @@ def decode_anchor_prediction(anchor_cls, anchor_reg_t, size_list, asp_list,
     pos_score = np.max(anchor_cls, axis = -1)[is_pos]
     return pos_cls, pos_score, pred_rect[is_pos.flatten()]
 
-def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
+def make_anchor(anchor_div,
+                offset_y_list,
+                offset_x_list,
+                size_list,
+                asp_list):
     # まずasp=1.0, size=1.0で作る
     anchor_div_y = anchor_div[0]
     anchor_div_x = anchor_div[1]
@@ -151,20 +158,21 @@ def make_anchor(anchor_div, size_list = [1.0], asp_list = [0.5, 1.0, 2.0]):
     base_w  = (x1 - x0)
     assert((base_h > 0.0).all())
     assert((base_w > 0.0).all())
-    anchors = np.empty((anchor_div_y, anchor_div_x, len(size_list), len(asp_list), 4)).astype(np.float32)
-    for s in range(len(size_list)):
-        for a in range(len(asp_list)):
-            h = base_h * size_list[s] / np.sqrt(asp_list[a])
-            w = base_w * size_list[s] * np.sqrt(asp_list[a])
-            anchors[:, :, s, a, 0] = yc.reshape(-1, 1) - 0.5 * h.reshape(-1, 1)
-            anchors[:, :, s, a, 1] = xc.reshape( 1,-1) - 0.5 * w.reshape( 1,-1)
-            anchors[:, :, s, a, 2] = yc.reshape(-1, 1) + 0.5 * h.reshape(-1, 1) 
-            anchors[:, :, s, a, 3] = xc.reshape( 1,-1) + 0.5 * w.reshape( 1,-1)
+    anchors = np.empty((anchor_div_y, anchor_div_x, offset_y_list.size, offset_x_list.size, size_list.size, asp_list.size, 4)).astype(np.float32)
+    for oy in range(offset_y_list.size):
+        for ox in range(offset_x_list.size):
+            for s in range(size_list.size):
+                for a in range(asp_list.size):
+                    h = base_h * size_list[s] / np.sqrt(asp_list[a])
+                    w = base_w * size_list[s] * np.sqrt(asp_list[a])
+                    anchors[:, :, oy, ox, s, a, 0] = (yc + offset_y_list[oy] * base_h - 0.5 * h).reshape(-1, 1)
+                    anchors[:, :, oy, ox, s, a, 1] = (xc + offset_x_list[ox] * base_w - 0.5 * w).reshape( 1,-1)
+                    anchors[:, :, oy, ox, s, a, 2] = (yc + offset_y_list[oy] * base_h + 0.5 * h).reshape(-1, 1) 
+                    anchors[:, :, oy, ox, s, a, 3] = (xc + offset_x_list[ox] * base_w + 0.5 * w).reshape( 1,-1)
     anchors[anchors <= 0.0] = 0.0
     anchors[anchors >= 1.0] = 1.0
     assert((anchors <= 1.0).all())
     assert((anchors >= 0.0).all())
-    assert(anchors.ndim == 5)
     assert(anchors.shape[-1] == 4)
     return anchors.reshape(-1, 4)
 
@@ -178,7 +186,13 @@ def make_anchor_test():
     asp_list = [0.5, 1.0, 2.0]
     div_y = 10
     div_x = 20
-    anchor = make_anchor([div_y, div_x], size_list, asp_list)
+    offset_y_list = [0.0, 0.5]
+    offset_x_list = [0.0, 0.5]
+    anchor = make_anchor([div_y, div_x],
+                         offset_y_list = offset_y_list,
+                         offset_x_list = offset_x_list,
+                         size_list = size_list,
+                         asp_list = asp_list,)
     print(anchor.shape)
     n = 0
     for rect in anchor:

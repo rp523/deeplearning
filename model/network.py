@@ -273,7 +273,8 @@ class ImageNetwork:
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
 
-    def add_rect_loss(self, name, gamma, size_list, asp_list,
+    def add_rect_loss(self, name, gamma, 
+                      offset_y_list, offset_x_list, size_list, asp_list,
                       cls_layer_name, reg_layer_name,
                       cls_label_name, reg_label_name):
         pred_cls = self.get_input(cls_layer_name)
@@ -359,10 +360,15 @@ class ImageNetwork:
         cls_loss = tf.cond(norm > 0.0, lambda: cls_loss / norm, lambda: tf.cond(neg_norm > 0.0, lambda: cls_loss / neg_norm, lambda: zero))
         assert(not label_cls_onehot in self.__loss_dict.keys())
         self.__loss_dict[cls_label_name]  = cls_loss
-        base_anchor = make_anchor([div_y, div_x], 
+        base_anchor = make_anchor([div_y, div_x],
+                                  offset_y_list = offset_y_list,
+                                  offset_x_list = offset_x_list,
                                   size_list = size_list,
                                   asp_list = asp_list)
-        self.__anchor[reg_label_name] = base_anchor.reshape(div_y, div_x, len(size_list) * len(asp_list), 4)
+        self.__anchor[reg_label_name] = base_anchor.reshape(div_y,
+                                                            div_x,
+                                                            offset_y_list.size * offset_x_list.size * size_list.size * asp_list.size,
+                                                            4)
         
     
     def get_anchor(self, name):
