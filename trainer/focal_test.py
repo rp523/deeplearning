@@ -1,5 +1,5 @@
 #coding: utf-8
-import os, sys
+import os, sys, subprocess
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
@@ -169,7 +169,9 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
-    if os.name == "nt":
+    pcname = subprocess.getoutput("uname -n")
+    if (pcname == "isgsktyktt-VJS111") or \
+       (pcname == "Yusuke-PC"):
         train_type = "debug"
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     pred_dir = os.path.join(result_dir, "pred_img")
@@ -213,7 +215,7 @@ def focal_trial():
                                        rect[2] * img_h),
                                       outline = (255,0,0))
                     pil.show()
-                    #exit()
+                    exit()
                 
                 if 0:
                     pal = []
@@ -259,7 +261,7 @@ def focal_trial():
                     exit()
 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
-                #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict))
+                #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
                 if b % 99 == 0 and (epoch > 0) and (b > 0):
                     # make folder
                     dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
