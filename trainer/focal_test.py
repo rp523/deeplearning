@@ -236,7 +236,7 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    if 1:
+    if 0:
         pal = []
         pal.append((0,0,255))
         pal.append((255,0,0))
@@ -300,7 +300,7 @@ def focal_trial():
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                if b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0 and (epoch > 0) and (b > 0):
+                if (b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0) and (b > 0):
                     # make folder
                     dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
                     if not os.path.exists(dst_pred_dir):
