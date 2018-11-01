@@ -35,6 +35,7 @@ class ImageNetwork:
         self.__label_dict = {}
         self.__cls_weight = []
         
+        self.__weight_list = []
         self.__anchor = {}
         self.__anchor_ph = {}
         
@@ -105,7 +106,8 @@ class ImageNetwork:
         
         new_layer = tf.add(tf.matmul(input_layer, weight), bias, name = name)
         self.add_layer(new_layer)
-    
+        self.__weight_list.append(weight)
+        
     def add_upsample(self, scale_y, scale_x, upType = "nn", name = None, input_name = None):
         input_layer = self.get_input(input_name)
         input_shape = input_layer.get_shape().as_list()
@@ -141,17 +143,17 @@ class ImageNetwork:
         new_layer = self.make_conv(input_layer, filter_param, output_ch, bias, name)
         self.add_layer(new_layer)
         
-    def make_conv(self, input_layer, filter_param, output_ch, bias = True, name = None, dtype = None):
+    def make_conv(self, input_layer, filter_param, output_ch, bias = True, dtype = None):
         assert(len(input_layer.get_shape()) == 4)
     
         input_ch = int(input_layer.get_shape()[-1])
         
-        filter = tf.get_variable("conv_filter{}".format(len(self.__layer_list)),
+        weight = tf.get_variable("conv_filter{}".format(len(self.__layer_list)),
                                   shape = [filter_param.kernel_y, filter_param.kernel_x, input_ch, output_ch],
                                   initializer = tf.contrib.layers.xavier_initializer(),
                                   dtype = self.__get_dtype(dtype))
         new_layer = tf.nn.conv2d(input = input_layer,
-                                 filter = filter,
+                                 filter = weight,
                                  strides=[1, filter_param.stride_y, filter_param.stride_x, 1],
                                  padding = self.__get_padding_str(filter_param.padding))
         
@@ -161,6 +163,7 @@ class ImageNetwork:
                                    initializer = tf.contrib.layers.xavier_initializer(),
                                    dtype = self.__get_dtype(dtype))
             new_layer = tf.add(new_layer, bias)
+        self.__weight_list.append(weight)
         return new_layer
 
     def add_pool(self, pool_type, filter_param, name = None, input_name = None):
@@ -252,10 +255,13 @@ class ImageNetwork:
                            name = name)
         self.add_layer(new_layer)
     
-    def get_total_loss(self):
+    def get_total_loss(self, weight_decay = None):
         loss = tf.Variable(0.0, dtype = tf.float32)
         for v in self.__loss_dict.values():
             loss = tf.add(loss, v)
+        if weight_decay is not None:
+            for weight in self.__weight_list:
+                loss = loss + weight_decay * 0.5 * tf.reduce_sum(weight ** 2)
         return loss
     
     def add_loss(self, loss_type, name, input_name = None, gamma = None):

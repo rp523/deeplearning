@@ -182,7 +182,7 @@ def focal_trial():
     
     bdd = BDD100k(resized_h = img_h,
                   resized_w = img_w)
-    total_loss = network.get_total_loss()
+    total_loss = network.get_total_loss(weight_decay = 1E-4)
     optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
     
     train_type = "train"
