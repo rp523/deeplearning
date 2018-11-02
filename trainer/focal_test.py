@@ -167,7 +167,55 @@ def focal_net(img_h,
                               reg_label_name = "reg_label{}".format(i))
     
     return network
-    
+
+def evaluate(network, img_h, img_w, 
+             anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, 
+             val_type, val_data, tgt_words_list,
+             dst_pred_dir, restore_path):
+    with tf.Session() as sess:
+                    
+        if restore_path:
+            saver = tf.train.Saver()
+            ckpt = tf.train.get_checkpoint_state(restore_path)
+            if ckpt:
+                saver.restore(sess, ckpt.model_checkpoint_path)
+                for val_idx in tqdm(range(val_data.get_sample_num(val_type))):
+                    # one image
+                    img_arr, rect_labels, rects, _1, _2 = val_data.get_vertices_data(val_type, tgt_words_list, index = val_idx)
+                    eval_feed_dict = make_feed_dict(network, 1, img_arr, rect_labels, rects, pos_th = 0, neg_th = 0)
+                    #one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
+                    
+                    # output prediction image
+                    pal = []
+                    pal.append((0,0,255))
+                    pal.append((255,0,0))
+                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_img)
+                    for i in range(2, 5 + 1):
+                        cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
+                                                                    anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
+                                                                    size_list = anchor_size,
+                                                                    asp_list = anchor_asp,
+                                                                    offset_y_list = anchor_offset_y,
+                                                                    offset_x_list = anchor_offset_x,
+                                                                    thresh = 0.5)
+                        for j in range(cls.size):
+                            if cls[j] != 0:
+                                draw.rectangle((rect[j][1] * img_w,
+                                                rect[j][0] * img_h,
+                                                rect[j][3] * img_w,
+                                                rect[j][2] * img_h),
+                                                outline = pal[cls[j] - 1])
+                                draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                          text = "{:.2f}".format(score[j]),
+                                          fill = pal[cls[j] - 1])
+                    dst_name = "img{0:05d}.png".format(val_idx)
+                    # make folder
+                    if not os.path.exists(dst_pred_dir):
+                        os.makedirs(dst_pred_dir)
+                    dst_path = os.path.join(dst_pred_dir, dst_name)
+                    pil_img.save(dst_path)
+   
 def focal_trial():
     
     anchor_size = 2.0 ** (np.arange(0, 2) / 2)
@@ -212,6 +260,8 @@ def focal_trial():
             train_type = "debug"
             val_type = "debug"
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+    os.makedirs(result_dir)
+    
     if 0:
         pal = []
         pal.append((0,0,255))
@@ -273,67 +323,30 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    if 0:   # only evaluation
-        with tf.Session() as sess:
-            restore_path = r""
-            dst_pred_dir = "eval_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-                        
-            if restore_path:
-                saver = tf.train.Saver()
-                ckpt = tf.train.get_checkpoint_state(restore_path)
-                if ckpt:
-                    saver.restore(sess, ckpt.model_checkpoint_path)
-                    for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
-                        # one image
-                        img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(val_type, tgt_words_list, index = val_idx)
-                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = np.zeros(1+len(tgt_words_list)))
-                        #one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
-                        
-                        # output prediction image
-                        pal = []
-                        pal.append((0,0,255))
-                        pal.append((255,0,0))
-                        pil_img = Image.fromarray(img_arr.astype(np.uint8))
-                        draw = ImageDraw.Draw(pil_img)
-                        for i in range(2, 5 + 1):
-                            cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(network.get_layer("cls{}".format(i)), feed_dict = eval_feed_dict),
-                                                                        anchor_reg_t = sess.run(network.get_layer("reg{}".format(i)), feed_dict = eval_feed_dict),
-                                                                        size_list = anchor_size,
-                                                                        asp_list = anchor_asp,
-                                                                        offset_y_list = anchor_offset_y,
-                                                                        offset_x_list = anchor_offset_x,
-                                                                        thresh = 0.6)
-                            for j in range(cls.size):
-                                if cls[j] != 0:
-                                    draw.rectangle((rect[j][1] * img_w,
-                                                    rect[j][0] * img_h,
-                                                    rect[j][3] * img_w,
-                                                    rect[j][2] * img_h),
-                                                    outline = pal[cls[j] - 1])
-                                    draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
-                                              text = "{:.2f}".format(score[j]),
-                                              fill = pal[cls[j] - 1])
-                        dst_name = "img{0:05d}.png".format(val_idx)
-                        # make folder
-                        if not os.path.exists(dst_pred_dir):
-                            os.makedirs(dst_pred_dir)
-                        dst_path = os.path.join(dst_pred_dir, dst_name)
-                        pil_img.save(dst_path)
-        exit()
 
-    
+    log_interval_sec = 60 * 10
     with tf.Session() as sess:
         tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
         saver = tf.train.Saver()
 
         # restore
-        restore_path = None#"r"result_20181030_224248\model\epoch0001_batch3"
+        restore_path = r"C:\Users\Yusuke\workspace\deeplearning\trainer\result_20181102_232644\model\epoch0001_batch99"
         if restore_path:
             ckpt = tf.train.get_checkpoint_state(restore_path)
             if ckpt:
                 saver.restore(sess, ckpt.model_checkpoint_path)
         else:
             sess.run(tf.global_variables_initializer())
+        
+        start_time = time.time()
+        tmp_out = False
+        def save_model(epoch, b):
+            dst_model_dir = os.path.join(result_dir, "model", "epoch{0:04d}".format(epoch) + "_batch{}".format(b))
+            if not os.path.exists(dst_model_dir):
+                os.makedirs(dst_model_dir)
+            dst_model_path = os.path.join(dst_model_dir, "model.ckpt")
+            saver.save(sess, dst_model_path)
+            return dst_model_dir
         
         for epoch in range(epoch_num):
             for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
@@ -346,13 +359,22 @@ def focal_trial():
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                if (b % min(bdd.get_sample_num(train_type) - 1, 1000) == 0) and (b > 0):
+                if time.time() - start_time >= log_interval_sec:
                     # Save model
-                    dst_model_dir = os.path.join(result_dir, "model", "epoch{0:04d}".format(epoch) + "_batch{}".format(b))
-                    if not os.path.exists(dst_model_dir):
-                        os.makedirs(dst_model_dir)
-                    dst_model_path = os.path.join(dst_model_dir, "model.ckpt")
-                    saver.save(sess, dst_model_path)
+                    save_model(epoch, b)
+                    start_time = time.time()
                     
+                dst_pred_dir = os.path.join(result_dir, "tmp_out")
+                if 1:
+                    check = os.path.exists(dst_pred_dir)
+                    if check:
+                        if os.path.isdir(dst_pred_dir):
+                            if tmp_out is False:
+                                evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, val_type,
+                                         bdd, tgt_words_list, dst_pred_dir,
+                                         restore_path = save_model(epoch, b))
+                                tmp_out = True
+                    else:
+                        tmp_out = False
 if "__main__" == __name__:
     focal_trial()
