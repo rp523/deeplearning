@@ -201,7 +201,7 @@ def focal_trial():
     bdd = BDD100k(resized_h = img_h,
                   resized_w = img_w)
     total_loss = network.get_total_loss(weight_decay = 1E-4)
-    optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
+    optimizer = tf.train.GradientDescentOptimizer(lr).minimize(total_loss)
     
     train_type = "train"
     val_type = "val"
@@ -211,16 +211,8 @@ def focal_trial():
         if (pcname == "isgsktyktt-VJS111") or \
            (pcname == "Yusuke-PC"):
             train_type = "debug"
+            val_type = "debug"
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-    with tf.Session() as sess:
-        tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
-    
-    # クラス比を計算
-    reg_label_name_list = []
-    for i in range(2, 5 + 1):
-        reg_label_name_list.append("reg_label{}".format(i))
-    cls_freq = calc_class_freq(network, bdd, train_type, tgt_words_list, reg_label_name_list, pos_th, neg_th)
-
     if 0:
         pal = []
         pal.append((0,0,255))
@@ -284,7 +276,7 @@ def focal_trial():
     
     if 0:   # only evaluation
         with tf.Session() as sess:
-            restore_path = "/home/isgsktyktt/workspace/deeplearning/result_20181102_191455/model/epoch0001_batch100"
+            restore_path = r""
             dst_pred_dir = "eval_" + datetime.now().strftime("%Y%m%d_%H%M%S")
                         
             if restore_path:
@@ -294,9 +286,9 @@ def focal_trial():
                     saver.restore(sess, ckpt.model_checkpoint_path)
                     for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
                         # one image
-                        img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
-                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
-                        one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
+                        img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(val_type, tgt_words_list, index = val_idx)
+                        eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = np.zeros(1+len(tgt_words_list)))
+                        #one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                         
                         # output prediction image
                         pal = []
@@ -311,7 +303,7 @@ def focal_trial():
                                                                         asp_list = anchor_asp,
                                                                         offset_y_list = anchor_offset_y,
                                                                         offset_x_list = anchor_offset_x,
-                                                                        thresh = 0.5)
+                                                                        thresh = 0.6)
                             for j in range(cls.size):
                                 if cls[j] != 0:
                                     draw.rectangle((rect[j][1] * img_w,
@@ -328,10 +320,16 @@ def focal_trial():
                             os.makedirs(dst_pred_dir)
                         dst_path = os.path.join(dst_pred_dir, dst_name)
                         pil_img.save(dst_path)
-            exit()
+        exit()
+
+    # クラス比を計算
+    reg_label_name_list = []
+    for i in range(2, 5 + 1):
+        reg_label_name_list.append("reg_label{}".format(i))
+    cls_freq = calc_class_freq(network, bdd, train_type, tgt_words_list, reg_label_name_list, pos_th, neg_th)
 
     with tf.Session() as sess:
-
+        tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
         saver = tf.train.Saver()
 
         # restore
