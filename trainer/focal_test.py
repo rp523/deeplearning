@@ -212,8 +212,8 @@ def focal_trial():
            (pcname == "Yusuke-PC"):
             train_type = "debug"
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-    pred_dir = os.path.join(result_dir, "pred_img")
-    model_dir = os.path.join(result_dir, "model")
+    with tf.Session() as sess:
+        tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
     
     # クラス比を計算
     reg_label_name_list = []
@@ -343,7 +343,6 @@ def focal_trial():
             sess.run(tf.global_variables_initializer())
         
         for epoch in range(epoch_num):
-            batch_cnt = 0
             for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
                 
                 # one image
@@ -355,7 +354,7 @@ def focal_trial():
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
                 if (b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0) and (b > 0):
                     # Save model
-                    dst_model_dir = os.path.join(model_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(b))
+                    dst_model_dir = os.path.join(result_dir, "model", "epoch{0:04d}".format(epoch) + "_batch{}".format(b))
                     if not os.path.exists(dst_model_dir):
                         os.makedirs(dst_model_dir)
                     dst_model_path = os.path.join(dst_model_dir, "model.ckpt")
