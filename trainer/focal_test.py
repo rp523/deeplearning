@@ -282,9 +282,8 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    with tf.Session() as sess:
-        
-        if 0:   # only evaluation
+    if 0:   # only evaluation
+        with tf.Session() as sess:
             restore_path = "/home/isgsktyktt/workspace/deeplearning/result_20181102_191455/model/epoch0001_batch100"
             dst_pred_dir = "eval_" + datetime.now().strftime("%Y%m%d_%H%M%S")
                         
@@ -330,6 +329,8 @@ def focal_trial():
                         dst_path = os.path.join(dst_pred_dir, dst_name)
                         pil_img.save(dst_path)
             exit()
+
+    with tf.Session() as sess:
 
         saver = tf.train.Saver()
 
