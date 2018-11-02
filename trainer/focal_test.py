@@ -12,7 +12,7 @@ import time
 from PIL import Image, ImageDraw
 from datetime import datetime
 
-def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th, cls_freq):
+def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th):
     feed_dict = {}
     
     label_dict = {}
@@ -30,8 +30,7 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg
         label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
     feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_arr.shape[0], img_arr.shape[1], img_arr.shape[2]),
                                               label_dict = label_dict,
-                                              is_training = True,
-                                              cls_freq = cls_freq))
+                                              is_training = True))
     
     return feed_dict
 
@@ -194,14 +193,14 @@ def focal_trial():
     
     batch_size = 1
     epoch_num = 1000
-    lr = 1e-2
+    lr = tf.placeholder(dtype = tf.float32)
     pos_th = 0.5
     neg_th = 0.4
     
     bdd = BDD100k(resized_h = img_h,
                   resized_w = img_w)
     total_loss = network.get_total_loss(weight_decay = 1E-4)
-    optimizer = tf.train.GradientDescentOptimizer(lr).minimize(total_loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate = lr).minimize(total_loss)
     
     train_type = "train"
     val_type = "val"
@@ -225,7 +224,7 @@ def focal_trial():
                 img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = i)
                 pil_img = Image.fromarray(img_arr.astype(np.uint8))
                 draw = ImageDraw.Draw(pil_img)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
                 # visualize anchored label
                 for l in range(2, 5 + 1):
                     cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
@@ -258,7 +257,7 @@ def focal_trial():
                 img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = i, flip = False)
                 pil_img = Image.fromarray(img_arr.astype(np.uint8))
                 draw = ImageDraw.Draw(pil_img)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
                 # visualize anchored label
                 for l in range(2, 5 + 1):
                     cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
@@ -322,12 +321,7 @@ def focal_trial():
                         pil_img.save(dst_path)
         exit()
 
-    # クラス比を計算
-    reg_label_name_list = []
-    for i in range(2, 5 + 1):
-        reg_label_name_list.append("reg_label{}".format(i))
-    cls_freq = calc_class_freq(network, bdd, train_type, tgt_words_list, reg_label_name_list, pos_th, neg_th)
-
+    
     with tf.Session() as sess:
         tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
         saver = tf.train.Saver()
@@ -347,7 +341,8 @@ def focal_trial():
                 # one image
                 rect_labels = np.empty(0)
                 img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
+                learn_feed_dict[lr] = 1e-2
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)

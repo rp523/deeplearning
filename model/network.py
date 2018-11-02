@@ -33,7 +33,6 @@ class ImageNetwork:
         # loss, label
         self.__loss_dict = {}
         self.__label_dict = {}
-        self.__cls_weight = []
         
         self.__weight_list = []
         self.__anchor = {}
@@ -279,7 +278,7 @@ class ImageNetwork:
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
 
-    def add_rect_loss(self, name, gamma, 
+    def add_rect_loss(self, name, gamma,
                       offset_y_list, offset_x_list, size_list, asp_list,
                       cls_layer_name, reg_layer_name,
                       cls_label_name, reg_label_name):
@@ -302,9 +301,6 @@ class ImageNetwork:
         anchor_ph = tf.placeholder(dtype = tf.float32,
                                    shape = [None, div_y, div_x, rect_ch, 4])
         self.__anchor_ph[reg_label_name] = anchor_ph
-        cls_weight = tf.placeholder(dtype = tf.float32,
-                                    shape = [cls_num])
-        self.__cls_weight.append(cls_weight)
         
         #cls_valid = (label_cls >= 0)
         reg_valid = (label_cls > 0)
@@ -355,7 +351,7 @@ class ImageNetwork:
         pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
         cls_loss_onehot = - label_cls_onehot * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
         cls_loss_vec = tf.reduce_sum(cls_loss_onehot, axis = [0,1,2,3])
-        cls_loss = tf.reduce_sum(cls_loss_vec * cls_weight)
+        cls_loss = tf.reduce_sum(cls_loss_vec)
         '''
         focal loss論文に準拠するならば、easy-negativeは実質的にロスがないためポジティブなanchorの数で正規化すべき。
         ただ実際には画像内にポジティブ画像が全く無い場合も学習の対象としたいので、その場合は
@@ -391,7 +387,7 @@ class ImageNetwork:
             assert(0)
         return optimizer
     '''
-    def create_feed_dict(self, input_image, is_training, label_dict = None, cls_freq = None):
+    def create_feed_dict(self, input_image, is_training, label_dict = None):
         
         feed_dict = {}
         # input image
@@ -400,10 +396,6 @@ class ImageNetwork:
         if label_dict is not None:
             for name, label in label_dict.items():
                 feed_dict[self.__label_dict[name]] = label
-        
-        if len(cls_freq) != 0:
-            for cls_weight in self.__cls_weight:
-                feed_dict[cls_weight] = (1.0 / cls_freq) / np.sum(1.0 / cls_freq)
         
         # for dropout
         if is_training is True:
