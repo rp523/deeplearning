@@ -176,7 +176,7 @@ def focal_trial():
     
     batch_size = 1
     epoch_num = 1000
-    lr = 1e-5
+    lr = 1e-2
     pos_th = 0.5
     neg_th = 0.4
     
@@ -300,7 +300,7 @@ def focal_trial():
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                if (b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0) and (b > 0):
+                if (b % min(bdd.get_sample_num(train_type) - 1, 1000) == 0) and (b > 0):
                     # make folder
                     dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
                     if not os.path.exists(dst_pred_dir):
