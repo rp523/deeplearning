@@ -1,6 +1,9 @@
 #coding:utf-8
+import os
 import numpy as np
-
+from PIL import Image
+import common.fileio as fio
+from tqdm import tqdm
 
 class Dataset:
     
@@ -93,3 +96,25 @@ class Dataset:
                 exists = True
                 break
         return exists
+    
+    def convert_to_npy(self, src_dir_path, dst_dir_path, src_ext):
+        assert(os.path.exists(src_dir_path))
+        assert(os.path.isdir(src_dir_path))
+        assert(os.path.exists(dst_dir_path))
+        assert(os.path.isdir(dst_dir_path))
+        img_path_list = fio.get_file_list(src_dir_path, tgt_ext = src_ext)
+        for i in tqdm(range(len(img_path_list))):
+            img_path = img_path_list[i]
+            dst_path = os.path.join(dst_dir_path, fio.get_file_name(img_path))[:-len(src_ext)] + ".npy"
+            np.save(dst_path, np.asarray(Image.open(img_path)).astype(np.uint8))
+
+def main():
+    for dat_type in ["train", "val", "test"]:
+        src_dir_path = os.path.join(r"/media/isgsktyktt/EC-PHU3/bdd100k/images", dat_type)
+        dst_dir_path = os.path.join(r"/media/isgsktyktt/EC-PHU3/bdd100k/npy_images", dat_type)
+        if not os.path.exists(dst_dir_path):
+            os.makedirs(dst_dir_path)
+        Dataset().convert_to_npy(src_dir_path, dst_dir_path, ".jpg")
+if "__main__" == __name__:
+    main()
+    print("Done.")
