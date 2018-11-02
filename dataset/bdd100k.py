@@ -158,7 +158,7 @@ class BDD100k(Dataset):
         return len(self.__seg_path_dict[data_type])
     
     def get_seg_data(self, data_type, index = None):
-        self.__update_list(data_type)
+        self.__update_seg_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__seg_path_dict[data_type]))
         seg_path = self.__seg_path_dict[data_type][index]
@@ -309,6 +309,7 @@ class BDD100k(Dataset):
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
         red   = (255,   0,   0, 128)
         blue  = (  0,   0, 255,  64)
+        green = (  0, 255,   0,  64)
         white = (255, 255, 255, 255)
 
         rgb_img = Image.fromarray(rgb_arr)
@@ -331,13 +332,19 @@ class BDD100k(Dataset):
                     break
         for i in range(len(polygons)):
             polygon = (polygons[i] * np.array([dh , dw]))[:,::-1]
-            draw.polygon(polygon.flatten().tolist(), fill = blue)
             for k, v in self.label_dict.items():
                 if v == poly_labels[i]:
                     draw.text([max(0, min(dw - 1, np.average(polygon[:, 0]))),
                                max(0, min(dh - 1, np.average(polygon[:, 1])) - fontheight)],
                                k,
                                fill = white)
+                    if k == "lane":
+                        fill_col = green
+                    elif k == "drivable area":
+                        fill_col = blue
+                    else:
+                        assert(0)
+                    draw.polygon(polygon.flatten().tolist(), fill = fill_col)
                     break
         #rgb_img.show()
         return rgb_img
@@ -405,6 +412,7 @@ def make_seg_summary_img(data_type):
     dst_dir = os.path.join(dst_dir_path, data_type)
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
+    print(dst_dir)
     for i in tqdm(range(b.get_seg_sample_num(data_type))):
         rgb_arr, seg_arr = b.get_seg_data(data_type, i)
         b.summary_seg_data(rgb_arr, seg_arr).save( \
@@ -444,6 +452,6 @@ def make_vertices_summary_img(data_type, tgt_labels):
         
 if __name__ == "__main__":
     tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
-                  ["person", "rider"]]
+                      ["person", "rider"]]
     make_vertices_summary_img("debug", tgt_words_list)
     print("Done.")
