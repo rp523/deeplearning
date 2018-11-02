@@ -47,23 +47,17 @@ def calc_class_freq(network, bdd, dat_type, tgt_words_list, reg_label_name_list,
                 cnt[c] = cnt[c] + np.sum(cls == c)
     return cnt / np.sum(cnt)
 
-def focal_trial():
+
+def focal_net(img_h,
+              img_w,
+              img_ch,
+              anchor_size,
+              anchor_asp,
+              anchor_offset_y,
+              anchor_offset_x,
+              tgt_words_list):
     
-    anchor_size = 2.0 ** (np.arange(0, 2) / 2)
-    anchor_asp  = np.linspace(0.5, 2.0, 3)
-    anchor_offset_y = np.arange(0, 3) / 3
-    anchor_offset_x = np.arange(0, 3) / 3
-    img_h  = 256
-    img_w  = img_h * 2
-    img_ch = 3
-    
-    tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
-                      ["person", "rider"]]
-    
-    #from PIL import Image;Image.fromarray(rgb_arr_).show();exit()
-    network = ImageNetwork(image_h  = img_h,
-                           image_w  = img_w,
-                           image_ch = img_ch)
+    network = ImageNetwork(img_h, img_w, img_ch)
     
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(7, 7, 2, 2, True), 32, "relu")
     
@@ -173,6 +167,30 @@ def focal_trial():
                               cls_label_name = "cls_label{}".format(i),
                               reg_label_name = "reg_label{}".format(i))
     
+    return network
+    
+def focal_trial():
+    
+    anchor_size = 2.0 ** (np.arange(0, 2) / 2)
+    anchor_asp  = np.linspace(0.5, 2.0, 3)
+    anchor_offset_y = np.arange(0, 3) / 3
+    anchor_offset_x = np.arange(0, 3) / 3
+    img_h  = 256
+    img_w  = img_h * 2
+    img_ch = 3
+    
+    tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+                      ["person", "rider"]]
+    
+    #from PIL import Image;Image.fromarray(rgb_arr_).show();exit()
+    network = focal_net(img_h  = img_h,
+                        img_w  = img_w,
+                        img_ch = img_ch,
+                        anchor_size = anchor_size,
+                        anchor_asp = anchor_asp,
+                        anchor_offset_y = anchor_offset_y,
+                        anchor_offset_x = anchor_offset_x,
+                        tgt_words_list = tgt_words_list)
     
     batch_size = 1
     epoch_num = 1000
@@ -265,55 +283,21 @@ def focal_trial():
         exit()
     
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        saver = tf.train.Saver()
         
-        # restore
-        restore_path = None#"r"result_20181030_224248\model\epoch0001_batch3"
-        if restore_path:
-            ckpt = tf.train.get_checkpoint_state(restore_path)
-            if ckpt:
-                saver.restore(sess, ckpt.model_checkpoint_path)
-        
-        for epoch in range(epoch_num):
-            batch_cnt = 0
-            for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
-                batch_cnt += batch_size
-                
-                # one image
-                rect_labels = np.empty(0)
-                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
-                
-                if 0:
-                    # visualize annotation rect
-                    pil = Image.fromarray(img_arr.astype(np.uint8))
-                    drw = ImageDraw.Draw(pil)
-                    for rect in rects:
-                        drw.rectangle((rect[1] * img_w,
-                                       rect[0] * img_h,
-                                       rect[3] * img_w,
-                                       rect[2] * img_h),
-                                      outline = (255,0,0))
-                    pil.show()
-                    exit()
-                
-                sess.run(optimizer, feed_dict = learn_feed_dict)
-                #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                if (b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0) and (b > 0):
-                    # make folder
-                    dst_pred_dir = os.path.join(pred_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
-                    if not os.path.exists(dst_pred_dir):
-                        os.makedirs(dst_pred_dir)
-                    
-                    starttime = time.time()
-                    val_loss = 0.0
+        if 0:   # only evaluation
+            restore_path = "/home/isgsktyktt/workspace/deeplearning/result_20181102_191455/model/epoch0001_batch100"
+            dst_pred_dir = "eval_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+                        
+            if restore_path:
+                saver = tf.train.Saver()
+                ckpt = tf.train.get_checkpoint_state(restore_path)
+                if ckpt:
+                    saver.restore(sess, ckpt.model_checkpoint_path)
                     for val_idx in tqdm(range(bdd.get_sample_num(val_type))):
                         # one image
                         img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = val_idx)
                         eval_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
                         one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
-                        val_loss = val_loss + one_loss
                         
                         # output prediction image
                         pal = []
@@ -340,19 +324,42 @@ def focal_trial():
                                               text = "{:.2f}".format(score[j]),
                                               fill = pal[cls[j] - 1])
                         dst_name = "img{0:05d}.png".format(val_idx)
+                        # make folder
+                        if not os.path.exists(dst_pred_dir):
+                            os.makedirs(dst_pred_dir)
                         dst_path = os.path.join(dst_pred_dir, dst_name)
                         pil_img.save(dst_path)
-                        
-                    endtime = time.time()
-                    val_txt = "epoch:{0:04d}".format(epoch) + "_batch{0:06d}".format(batch_cnt) + "loss={}".format(val_loss) + "," + "{:.2f}sec".format(endtime-starttime)
-                    val_path = os.path.join(result_dir, "eval_log.txt")
-                    open(val_path, "a").write(val_txt + "\n")
-                    
+            exit()
+
+        saver = tf.train.Saver()
+
+        # restore
+        restore_path = None#"r"result_20181030_224248\model\epoch0001_batch3"
+        if restore_path:
+            ckpt = tf.train.get_checkpoint_state(restore_path)
+            if ckpt:
+                saver.restore(sess, ckpt.model_checkpoint_path)
+        else:
+            sess.run(tf.global_variables_initializer())
+        
+        for epoch in range(epoch_num):
+            batch_cnt = 0
+            for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
+                
+                # one image
+                rect_labels = np.empty(0)
+                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th, cls_freq = cls_freq)
+                
+                sess.run(optimizer, feed_dict = learn_feed_dict)
+                #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
+                if (b % min(bdd.get_sample_num(train_type) - 1, 10000) == 0) and (b > 0):
                     # Save model
-                    dst_model_dir = os.path.join(model_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(batch_cnt))
+                    dst_model_dir = os.path.join(model_dir, "epoch{0:04d}".format(epoch) + "_batch{}".format(b))
                     if not os.path.exists(dst_model_dir):
                         os.makedirs(dst_model_dir)
                     dst_model_path = os.path.join(dst_model_dir, "model.ckpt")
                     saver.save(sess, dst_model_path)
+                    
 if "__main__" == __name__:
     focal_trial()
