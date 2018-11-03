@@ -330,7 +330,7 @@ def focal_trial():
         saver = tf.train.Saver()
 
         # restore
-        restore_path = r"C:\Users\Yusuke\workspace\deeplearning\trainer\result_20181102_232644\model\epoch0001_batch99"
+        restore_path = None#*r"C:\Users\Yusuke\workspace\deeplearning\trainer\result_20181102_232644\model\epoch0001_batch99"
         if restore_path:
             ckpt = tf.train.get_checkpoint_state(restore_path)
             if ckpt:
