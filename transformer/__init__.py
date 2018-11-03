@@ -36,18 +36,23 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     
     assert(label_vec.size == label_rect_mat.shape[0])
     assert(label_rect_mat.shape[1] == 4)
+    assert(anchor.ndim == 2)
     assert(anchor.shape[1] == 4)
     
     # ground truthにひもづかなかった場合
     if label_vec.size == 0:
         return anchor_label_val, anchor
     
-    label_h = label_rect_mat[:,2] - label_rect_mat[:,0]
-    label_w = label_rect_mat[:,3] - label_rect_mat[:,1]
+    label_yc = 0.5 * (label_rect_mat[:,2] + label_rect_mat[:,0])
+    label_xc = 0.5 * (label_rect_mat[:,3] + label_rect_mat[:,1])
+    label_h  =       (label_rect_mat[:,2] - label_rect_mat[:,0])
+    label_w  =       (label_rect_mat[:,3] - label_rect_mat[:,1])
     label_area = label_h * label_w
     assert((label_area > 0.0).all())
-    anchor_h = anchor[:,2] - anchor[:,0]
-    anchor_w = anchor[:,3] - anchor[:,1]
+    anchor_yc = 0.5 * (anchor[:,2] + anchor[:,0])
+    anchor_xc = 0.5 * (anchor[:,3] + anchor[:,1])
+    anchor_h  =       (anchor[:,2] - anchor[:,0])
+    anchor_w  =       (anchor[:,3] - anchor[:,1])
     anchor_area = anchor_h * anchor_w
     assert((anchor_area > 0.0).all())
     
@@ -83,17 +88,22 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
     assert(is_inv_anchor.ndim == 1)
     assert(is_pos_anchor.size == anchor.shape[0])
     assert(is_inv_anchor.size == anchor.shape[0])
-    label_table = label_vec + np.zeros((anchor.shape[0], label_vec.size)).astype(np.int32)
-    anchor_label_val[is_pos_anchor] = label_table[np.arange(label_table.shape[0]), max_iou_label_idx][is_pos_anchor]
     anchor_label_val[is_inv_anchor] = -1
     
-    ret_anchor = np.zeros((anchor_label_val.size, label_rect_mat.shape[1])).astype(np.float32)
+    t_anchor = anchor.copy()
     for i in range(anchor_label_val.size):
         if is_pos_anchor[i]:
-            ret_anchor[i] = label_rect_mat[max_iou_label_idx[i]]
-    assert(ret_anchor.shape[0] == anchor_label_val.size)
-    assert(ret_anchor.shape[1] == 4)
-    return anchor_label_val, ret_anchor
+            label_idx = max_iou_label_idx[i]
+            t_anchor[i, 0] = (label_yc[label_idx] - anchor_yc[i]) / anchor_h[i]
+            t_anchor[i, 1] = (label_xc[label_idx] - anchor_xc[i]) / anchor_w[i]
+            t_anchor[i, 2] = np.log(label_h[label_idx] / anchor_h[i])
+            t_anchor[i, 3] = np.log(label_w[label_idx] / anchor_w[i])
+
+            anchor_label_val[i] = label_vec[label_idx]
+    
+    assert(t_anchor.shape[0] == anchor_label_val.size)
+    assert(t_anchor.shape[1] == 4)
+    return anchor_label_val, t_anchor
 
 def decode_anchor_prediction(anchor_cls, anchor_reg_t,
                              offset_y_list, offset_x_list, size_list, asp_list,
@@ -109,10 +119,10 @@ def decode_anchor_prediction(anchor_cls, anchor_reg_t,
     anchor_x0 = base_anchor[:,1]
     anchor_y1 = base_anchor[:,2]
     anchor_x1 = base_anchor[:,3]
-    anchor_yc = 0.5 * (anchor_y0 + anchor_y1)
-    anchor_xc = 0.5 * (anchor_x0 + anchor_x1)
-    anchor_h  = 0.5 * (anchor_y1 - anchor_y0)
-    anchor_w  = 0.5 * (anchor_x1 - anchor_x0)
+    anchor_yc = 0.5 * (anchor_y1 + anchor_y0)
+    anchor_xc = 0.5 * (anchor_x1 + anchor_x0)
+    anchor_h  =       (anchor_y1 - anchor_y0)
+    anchor_w  =       (anchor_x1 - anchor_x0)
     assert((anchor_h > 0.0).all())
     assert((anchor_w > 0.0).all())
     
