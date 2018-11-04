@@ -38,7 +38,6 @@ class BDD100k(Dataset):
         self.__data_path = s.dataset_path("bdd100k")
         self.__rgb_path_dict = {}
         self.__json_path_dict = {}
-        self.__area_path_dict = {}
         self.__seg_path_dict = {}
         self.__segimg_path_dict = {}
         self.__rgb_h, self.__rgb_w = 720, 1280
@@ -103,50 +102,33 @@ class BDD100k(Dataset):
             if os.path.exists(rgb_dir_path):
                 rgb_path_list_ = fileio.get_file_list(tgt_dir = rgb_dir_path,
                                                       tgt_ext = ".jpg")
-            area_dir_path = os.path.join(self.__data_path, "drivable_maps", data_type)
-            if os.path.exists(area_dir_path):
-                area_path_list_ = fileio.get_file_list(tgt_dir = area_dir_path,
-                                                       tgt_ext = ".png")
             assert(len(json_path_list_) > 0)
             assert(len(rgb_path_list_) > 0)
-            assert(len(area_path_list_) > 0)
 
             json_key_list = []
             rgb_key_list  = []
-            area_key_list = []
             for json_path in json_path_list_:
                 key = fileio.get_file_name(json_path)[:-len(".json")]
                 json_key_list.append(key)
             for rgb_path in rgb_path_list_:
                 key = fileio.get_file_name(rgb_path)[:-len(".jpg")]
                 rgb_key_list.append(key)
-            for area_path in area_path_list_:
-                key = fileio.get_file_name(area_path)[:-len("_drivable_id.png")]
-                area_key_list.append(key)
             assert(len(json_key_list) > 0)
             assert(len(rgb_key_list) > 0)
-            assert(len(area_key_list) > 0)
             
             json_path_list = []
             rgb_path_list  = []
-            area_path_list = []
             for j in range(len(json_key_list)):
                 json_key = json_key_list[j]
                 if json_key in rgb_key_list:
-                    if json_key in area_key_list:
-                        json_path_list.append(json_path_list_[j])
-                        i = rgb_key_list.index(json_key)
-                        rgb_path_list.append(rgb_path_list_[i])
-                        i = area_key_list.index(json_key)
-                        area_path_list.append(area_path_list_[i])
+                    json_path_list.append(json_path_list_[j])
+                    i = rgb_key_list.index(json_key)
+                    rgb_path_list.append(rgb_path_list_[i])
             assert(len(json_path_list) == len(rgb_path_list))
-            assert(len(json_path_list) == len(area_path_list))
             assert(len(json_path_list) > 0)
             assert(len(rgb_path_list) > 0)
-            assert(len(area_path_list) > 0)
             self.__rgb_path_dict[data_type]  = rgb_path_list
             self.__json_path_dict[data_type] = json_path_list
-            self.__area_path_dict[data_type] = area_path_list
         return data_type
     
     def get_sample_num(self, data_type):
@@ -191,55 +173,6 @@ class BDD100k(Dataset):
                        fill = tuple(col),
                        font = font)
             cnt += font_size
-        return sum_img
-
-    def get_area_data(self, data_type, index = None):
-        self.__update_list(data_type)
-        if index is None:
-            index = np.random.randint(len(self.__area_path_dict[data_type]))
-        rgb_path = self.__rgb_path_dict[data_type][index]
-        rgb_arr = np.asarray(Image.open(rgb_path))
-
-        area_path = self.__area_path_dict[data_type][index]
-        area_arr = np.asarray(Image.open(area_path))
-        assert(len(super().area_dict.values()) >= np.max(area_arr))
-        return rgb_arr, area_arr
-    
-    def summary_area_data(self, rgb_arr, area_arr):
-        amp = 4
-        font_path = r"C:\Windows\Fonts\Myrica.TTC"
-        font_size = 24
-        font = ImageFont.truetype(font_path, font_size)
-
-        sum_arr = rgb_arr.copy().astype(np.int)
-        for k, v in super().area_dict.items():
-            fill_img = rgb_arr.copy().astype(np.int)
-            col = np.zeros(3).astype(np.int)
-            col[v - 1] = 255
-            fill_img[area_arr == v] = col
-            sum_arr = ((amp - 1) * sum_arr + fill_img) // amp
-        
-        rise_x = np.empty((area_arr.shape[0], area_arr.shape[1])).astype(np.int)
-        rise_y = np.empty((area_arr.shape[0], area_arr.shape[1])).astype(np.int)
-        rise_x[:, :] = np.arange(area_arr.shape[1]).reshape(1, -1)
-        rise_y[:, :] = np.arange(area_arr.shape[0]).reshape(-1, 1)
-        
-        sum_arr = sum_arr.astype(np.uint8)
-        sum_img = Image.fromarray(sum_arr)
-        draw = ImageDraw.Draw(sum_img, "RGB")
-        for k, v in super().area_dict.items():
-            fill_arr = np.zeros((area_arr.shape[0], area_arr.shape[1])).astype(np.float)
-            fill_arr[area_arr == v] = 1
-            col = np.zeros(3).astype(np.uint8)
-            col[v - 1] = 255
-            fill_x = rise_x * fill_arr
-            text_x = np.average(fill_x[fill_x > 0])
-            fill_y = rise_y * fill_arr
-            text_y = np.average(fill_y[fill_y > 0])
-            draw.text([text_x, text_y],
-                       k,
-                       fill = tuple(col.tolist()),
-                       font = font)
         return sum_img
 
     def get_vertices_data(self, data_type, tgt_words_list = None, index = None, flip = None):
@@ -291,7 +224,6 @@ class BDD100k(Dataset):
         
         rgb_path = self.__rgb_path_dict[data_type][index]
         rgb_pil = Image.open(rgb_path)
-        rgb_pil_w, rgb_pil_h = rgb_pil.size
         rgb_pil = rgb_pil.resize((self.__resized_w, self.__resized_h))
         rgb_arr = np.asarray(rgb_pil)
         
@@ -416,19 +348,6 @@ def make_seg_summary_img(data_type):
     for i in tqdm(range(b.get_seg_sample_num(data_type))):
         rgb_arr, seg_arr = b.get_seg_data(data_type, i)
         b.summary_seg_data(rgb_arr, seg_arr).save( \
-            os.path.join(dst_dir, "{0:06d}.png".format(i)))
-
-def make_area_summary_img(data_type):
-    b = BDD100k()
-    from tqdm import tqdm
-    dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "area_test")
-
-    dst_dir = os.path.join(dst_dir_path, data_type)
-    if not os.path.exists(dst_dir):
-        os.makedirs(dst_dir)
-    for i in tqdm(range(b.get_sample_num(data_type))):
-        rgb_arr, area_arr = b.get_area_data(data_type, i)
-        b.summary_area_data(rgb_arr, area_arr).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 
 def make_vertices_summary_img(data_type, tgt_labels):
