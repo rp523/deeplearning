@@ -143,10 +143,10 @@ def decode_anchor_prediction(anchor_cls, anchor_reg_t,
     pred_pos1 = np.append(pred_y1.reshape(-1, 1), pred_x1.reshape(-1, 1), axis = 1)
     pred_rect  = np.append(pred_pos0, pred_pos1, axis = 1)
     
-    is_pos = np.max(anchor_cls, axis = -1) > thresh
-    pos_cls = np.argmax(anchor_cls, axis = -1)[is_pos]
-    pos_score = np.max(anchor_cls, axis = -1)[is_pos]
-    return pos_cls, pos_score, pred_rect[is_pos.flatten()]
+    is_assigned = np.max(anchor_cls, axis = -1) > thresh
+    assigned_cls = np.argmax(anchor_cls, axis = -1)[is_assigned]
+    assigned_score = np.max(anchor_cls, axis = -1)[is_assigned]
+    return assigned_cls, assigned_score, pred_rect[is_assigned.flatten()]
 
 def make_anchor(anchor_div,
                 offset_y_list,
