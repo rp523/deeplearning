@@ -182,7 +182,7 @@ def evaluate(network, img_h, img_w,
                 for val_idx in tqdm(range(val_data.get_sample_num(val_type))):
                     # one image
                     img_arr, rect_labels, rects, _1, _2 = val_data.get_vertices_data(val_type, tgt_words_list, index = val_idx)
-                    eval_feed_dict = make_feed_dict(network, 1, img_arr, rect_labels, rects, pos_th = 0, neg_th = 0)
+                    eval_feed_dict = make_feed_dict(network = network, img_arr = img_arr, rect_labels = rect_labels, rects = rects, pos_th = 0, neg_th = 0, batch_size = 1)
                     #one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                     
                     # output prediction image
@@ -240,7 +240,7 @@ def focal_trial():
                         tgt_words_list = tgt_words_list)
     
     batch_size = 1
-    epoch_num = 1000
+    epoch_num = 5
     lr = tf.placeholder(dtype = tf.float32)
     pos_th = 0.5
     neg_th = 0.4
@@ -252,7 +252,9 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
-    if 1:
+    log_interval_sec = 60 * 15
+    restore_path = r"/floyd/input/model"
+    if 0:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
@@ -323,14 +325,22 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
+    if 1:
+        dst_pred_dir = r"C:\Users\Yusuke\workspace\tmp_out"
+        restore_path = r"C:\Users\Yusuke\workspace\model"
+        if not os.path.exists(dst_pred_dir):
+            os.makedirs(dst_pred_dir)
+        evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, val_type,
+         bdd, tgt_words_list, 
+         dst_pred_dir,
+         restore_path)
+        exit()
 
-    log_interval_sec = 60 * 10
     with tf.Session() as sess:
         tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
         saver = tf.train.Saver()
 
         # restore
-        restore_path = None#*r"C:\Users\Yusuke\workspace\deeplearning\trainer\result_20181102_232644\model\epoch0001_batch99"
         if restore_path:
             ckpt = tf.train.get_checkpoint_state(restore_path)
             if ckpt:
