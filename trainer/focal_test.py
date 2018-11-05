@@ -157,6 +157,7 @@ def focal_net(img_h,
                                      name = "reg{}".format(i))
         network.add_rect_loss(name = "loss{}".format(i),
                               gamma = 2.0,
+                              alpha = 0.5,
                               size_list = anchor_size,
                               asp_list = anchor_asp,
                               offset_y_list = anchor_offset_y,
@@ -253,7 +254,7 @@ def focal_trial():
     train_type = "train"
     val_type = "val"
     log_interval_sec = 60 * 30
-    restore_path = r"C:\Users\Yusuke\workspace\model"
+    restore_path = None#r""
     if 1:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
