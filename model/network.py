@@ -278,7 +278,7 @@ class ImageNetwork:
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
 
-    def add_rect_loss(self, name, gamma,
+    def add_rect_loss(self, name, gamma, alpha,
                       offset_y_list, offset_x_list, size_list, asp_list,
                       cls_layer_name, reg_layer_name,
                       cls_label_name, reg_label_name):
@@ -324,7 +324,9 @@ class ImageNetwork:
         
         label_cls_onehot = tf.one_hot(label_cls, depth = cls_num)
         pred_cls = tf.reshape(pred_cls, [-1, div_y, div_x, rect_ch, cls_num])
-        cls_loss_onehot = - label_cls_onehot * ((1.0 - pred_cls) ** gamma) * tf.log((      pred_cls) + 1e-5)
+        p_t = (1.0 - pred_cls) + (2.0 * pred_cls - 1.0) * label_cls_onehot
+        alpha_mat = (1.0 - alpha) / (cls_num - 1) + (alpha * cls_num - 1.0) / (cls_num - 1) * label_cls_onehot
+        cls_loss_onehot = - alpha_mat * ((1.0 - p_t) ** gamma) * tf.log(p_t + 1e-5)
         cls_loss_vec = tf.reduce_sum(cls_loss_onehot, axis = [0,1,2,3])
         cls_loss = tf.reduce_sum(cls_loss_vec)
         '''
