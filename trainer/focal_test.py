@@ -252,9 +252,9 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
-    log_interval_sec = 60 * 15
-    restore_path = r"/floyd/input/model"
-    if 0:
+    log_interval_sec = 60 * 30
+    restore_path = r"C:\Users\Yusuke\workspace\model"
+    if 1:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
@@ -325,7 +325,7 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    if 1:
+    if 0:	# evaluate-only
         dst_pred_dir = r"C:\Users\Yusuke\workspace\tmp_out"
         restore_path = r"C:\Users\Yusuke\workspace\model"
         if not os.path.exists(dst_pred_dir):
