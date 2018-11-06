@@ -194,12 +194,13 @@ class ImageNetwork:
     def add_activation(self, activatioin_type, name = None, input_name = None):
         input_layer = self.get_input(input_name)
         if activatioin_type == "relu":
-            activ_func = tf.nn.relu
+            new_layer = tf.nn.relu(input_layer, name = name)
         elif activatioin_type == "tanh":
-            activ_func = tf.nn.tanh
+            new_layer = tf.nn.tanh(input_layer, name = name)
+        elif activatioin_type == "2**x-1":
+            new_layer = tf.identity(2 ** input_layer - 1.0, name = name)
         else:
             assert(0)
-        new_layer = activ_func(input_layer, name = name)
         self.add_layer(new_layer)
     
     def add_batchnorm(self, global_norm = True, name = None, input_name = None, dtype = None):
