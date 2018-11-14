@@ -6,13 +6,10 @@ from transformer import *
 
 class ImageNetwork:
     def __init__(self, image_h, image_w, image_ch,
+                 input_dtype = None,
                  dtype = None,
                  random_seed = None):
         tf.reset_default_graph()    # reset old settings
-        src_img_layer = tf.placeholder(dtype = tf.float32,
-                                       shape = [None, image_h, image_w, image_ch],
-                                       name = "input_image")
-        self.__layer_list = [src_img_layer]
         
         # default type of variables
         if dtype is not None:
@@ -38,7 +35,17 @@ class ImageNetwork:
         self.__anchor = {}
         self.__anchor_ph = {}
         
+        # only for debug
         self.debug = []
+        
+        if input_dtype is not None:
+            input_dtype = input_dtype
+        else:
+            input_dtype = tf.float32
+        src_img_layer = tf.placeholder(dtype = input_dtype,
+                                       shape = [None, image_h, image_w, image_ch],
+                                       name = "input_image")
+        self.__layer_list = [src_img_layer]
         
     def __get_padding_str(self, padding):
         assert(isinstance(padding, bool))
@@ -212,9 +219,9 @@ class ImageNetwork:
             axes = [0]
         mean, variance = tf.nn.moments(x = input_layer,
                                        axes = axes)
-        scale  = tf.Variable(tf.ones([input_ch]),
+        scale  = tf.Variable(tf.ones([input_ch], dtype = self.__get_dtype(dtype)),
                              dtype = self.__get_dtype(dtype))
-        offset = tf.Variable(tf.zeros([input_ch]),
+        offset = tf.Variable(tf.zeros([input_ch], dtype = self.__get_dtype(dtype)),
                              dtype = self.__get_dtype(dtype))
         
         new_layer = tf.nn.batch_normalization(x = input_layer,
@@ -261,15 +268,16 @@ class ImageNetwork:
             loss = tf.add(loss, v)
         if weight_decay is not None:
             for weight in self.__weight_list:
-                loss = loss + weight_decay * 0.5 * tf.reduce_sum(weight ** 2)
+                loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
         return loss
     
     def add_loss(self, loss_type, name, input_name = None, gamma = None):
         pred_layer = self.get_input(input_name)
+        # lossはすべてfloat32
         label = tf.placeholder(dtype = tf.float32,
                                shape = [None] + list(pred_layer.get_shape())[1:])
         if loss_type == "cross_entropy":
-            loss = - tf.reduce_mean(label * tf.log(pred_layer + 1e-5))
+            loss = - tf.reduce_mean(label * tf.cast(tf.log(pred_layer + 1e-5), tf.float32))
         elif loss_type == "L1":
             loss = tf.reduce_mean(label - pred_layer)
         else:

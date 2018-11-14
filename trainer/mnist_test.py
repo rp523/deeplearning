@@ -15,7 +15,9 @@ def mnist_trial():
 
     network = ImageNetwork(image_h = 28,
                            image_w = 28,
-                           image_ch = 1)
+                           image_ch = 1,
+                           input_dtype = tf.float16,
+                           dtype = tf.float16)
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 32, "relu")
     network.add_pool("MAX", ImageNetwork.FilterParam(2, 2, 2, 2, True))
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 64, "relu")
