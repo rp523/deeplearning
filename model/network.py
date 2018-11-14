@@ -47,6 +47,8 @@ class ImageNetwork:
                                        name = "input_image")
         self.__layer_list = [src_img_layer]
         
+        self.__is_training = tf.placeholder(dtype = tf.bool)
+        
     def __get_padding_str(self, padding):
         assert(isinstance(padding, bool))
         if padding:
@@ -204,8 +206,10 @@ class ImageNetwork:
             new_layer = tf.nn.relu(input_layer, name = name)
         elif activatioin_type == "tanh":
             new_layer = tf.nn.tanh(input_layer, name = name)
-        elif activatioin_type == "2**x-1":
-            new_layer = tf.identity(2 ** input_layer - 1.0, name = name)
+        elif activatioin_type == "ste":
+            new_layer = tf.cond(self.__is_training,
+                                lambda:tf.clip_by_value(input_layer, - 1.0, 1.0),
+                                lambda:tf.sign(input_layer))
         else:
             assert(0)
         self.add_layer(new_layer)
@@ -391,6 +395,7 @@ class ImageNetwork:
             for dropout_idx in range(len(self.__dropout_ph_list)):
                 feed_dict[self.__dropout_ph_list[dropout_idx]] = 1.0
         
+        feed_dict[self.__is_training] = is_training
         return feed_dict
     
     # to be deleted
