@@ -60,11 +60,6 @@ def focal_net(img_h,
     
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(7, 7, 2, 2, True), 32, "relu")
     
-    layer = network.get_input(name = None)
-    while layer.get_shape().as_list()[1] > (2 ** 5):
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 2, 2, True), 64, "relu")
-        layer = network.get_input(name = None)
-
     # conv1_x
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 2, 2, True), 32, "relu", name = "e1_1")
     
@@ -121,7 +116,7 @@ def focal_net(img_h,
         # classificatin
         feature_layer_name = "c{}".format(i)
         network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
-        for l in range(4 - 1 - 1):
+        for l in range(4):
             network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
         network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size *
                                                                                    anchor_asp.size *
@@ -219,10 +214,10 @@ def evaluate(network, img_h, img_w,
    
 def focal_trial():
     
-    anchor_size = 2.0 ** (np.arange(0, 2) / 2)
+    anchor_size = 4.0 * (2.0 ** (np.arange(0, 2) / 2))
     anchor_asp  = np.linspace(0.5, 2.0, 3)
-    anchor_offset_y = np.arange(0, 3) / 3
-    anchor_offset_x = np.arange(0, 3) / 3
+    anchor_offset_y = np.arange(0, 1) / 1
+    anchor_offset_x = np.arange(0, 1) / 1
     img_h  = 256
     img_w  = img_h * 2
     img_ch = 3
@@ -255,7 +250,7 @@ def focal_trial():
     val_type = "val"
     log_interval_sec = 60 * 30
     restore_path = None#r""
-    if 1:
+    if 0:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
