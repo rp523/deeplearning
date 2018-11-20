@@ -148,7 +148,7 @@ class ImageNetwork:
     def add_conv(self, filter_param, output_ch, bias = True, name = None, input_name = None, dtype = None):
         input_layer = self.get_input(input_name)
         assert(input_layer is not None)
-        new_layer = self.make_conv(input_layer, filter_param, output_ch, bias, name)
+        new_layer = self.make_conv(input_layer, filter_param, output_ch, bias, dtype)
         self.add_layer(new_layer)
         
     def make_conv(self, input_layer, filter_param, output_ch, bias = True, dtype = None):
