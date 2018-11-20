@@ -16,22 +16,31 @@ def mnist_trial():
     network = ImageNetwork(image_h = 28,
                            image_w = 28,
                            image_ch = 1,
-                           input_dtype = tf.float16,
-                           dtype = tf.float16)
-    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 32, "ste")
-    network.add_pool("MAX", ImageNetwork.FilterParam(2, 2, 2, 2, True))
-    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 64, "ste")
-    network.add_pool("MAX", ImageNetwork.FilterParam(2, 2, 2, 2, True))
+                           input_dtype = tf.float32,
+                           dtype = tf.float32)
+    network.add_conv(ImageNetwork.FilterParam(3, 3, 1, 1, True), 16)
+    network.add_batchnorm()
+    network.add_activation("relu")
+
+    network.add_conv(ImageNetwork.FilterParam(3, 3, 2, 2, True), 32)
+    network.add_batchnorm()
+    network.add_activation("relu")
+    
+    network.add_conv(ImageNetwork.FilterParam(3, 3, 2, 2, True), 64)
+    network.add_batchnorm()
+    network.add_activation("relu")
+    
     network.add_full_connect(1024)
-    network.add_activation("ste")
-    #network.add_dropout(0.5)
+    network.add_activation("relu")
+    network.add_dropout(0.5)
+    
     network.add_full_connect(10)
     network.add_softmax("answer")
     network.add_loss("cross_entropy", name = "ce_loss")
     #network.show()
     
     total_loss = network.get_total_loss(weight_decay = 1E-4)
-    batch_size = 32
+    batch_size = 16
     epoch_num = 100
     lr = 1e-4
     x, y = mnist.get_data("train")
