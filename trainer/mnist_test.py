@@ -12,23 +12,45 @@ from trainer import Trainer
 def mnist_trial():
     
     mnist = MNIST()
-
+    
+    N = 7
+    def quantize(x):
+        sign = tf.sign(x)
+        val = tf.abs(x)
+        y = tf.log(val) / tf.log(2.0) + N
+        y = tf.maximum(y, 0)
+        y = tf.cast(y, tf.int32)
+        y = tf.cast(y, tf.float32)
+        y = sign * (2 ** (y - N))
+        y = tf.reshape(x, x.get_shape())
+        return y
+    qflg = tf.placeholder(dtype = tf.bool)
     network = ImageNetwork(image_h = 28,
                            image_w = 28,
                            image_ch = 1,
                            input_dtype = tf.float32,
                            dtype = tf.float32)
-    network.add_conv(ImageNetwork.FilterParam(3, 3, 1, 1, True), 16)
-    network.add_batchnorm()
-    network.add_activation("relu")
-
-    network.add_conv(ImageNetwork.FilterParam(3, 3, 2, 2, True), 32)
-    network.add_batchnorm()
-    network.add_activation("relu")
-    
-    network.add_conv(ImageNetwork.FilterParam(3, 3, 2, 2, True), 64)
-    network.add_batchnorm()
-    network.add_activation("relu")
+    for i, filter_param in enumerate([ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                      ImageNetwork.FilterParam(3, 3, 2, 2, True),
+                                      ImageNetwork.FilterParam(3, 3, 2, 2, True)]):
+        output_ch = 2 ** (i + 4)
+        input_ch = network.get_input(None).get_shape().as_list()[3]
+        weight = network.make_conv_weight(filter_param, input_ch = input_ch, output_ch = output_ch)
+        bias   = network.make_conv_bias(output_ch = output_ch)
+        q_weight = quantize(weight)
+        print(weight, q_weight)
+        weight = tf.cond(qflg, lambda:weight, lambda:q_weight)
+        q_bias = quantize(bias)
+        bias = tf.cond(qflg, lambda:bias, lambda:q_bias)
+        network.add_conv(filter_param, output_ch, weight = weight, bias = bias)
+        layer = network.get_input(None)
+        q_layer = quantize(layer)
+        network.add_layer(tf.cond(qflg, lambda:layer, lambda:q_layer))
+        network.add_batchnorm()
+        network.add_activation("relu")
+        layer = network.get_input(None)
+        q_layer = quantize(layer)
+        network.add_layer(tf.cond(qflg, lambda:layer, lambda:q_layer))
     
     network.add_full_connect(1024)
     network.add_activation("relu")
@@ -56,10 +78,14 @@ def mnist_trial():
             for b in (range(x.shape[0] // batch_size)):
                 batch_cnt += batch_size
                 batch_idx = np.random.choice(np.arange(x.shape[0]), batch_size, replace = True)
-                learn_feed_dict = network.create_feed_dict(input_image = x[batch_idx] / 128 - 0.5, is_training = True, label_dict = {"ce_loss": y[batch_idx]})
+                is_training = True
+                learn_feed_dict = network.create_feed_dict(input_image = x[batch_idx] / 128 - 0.5, is_training = is_training, label_dict = {"ce_loss": y[batch_idx]})
+                learn_feed_dict[qflg] = is_training
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 if b % 10 == 0:
-                    eval_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = False, label_dict = {"ce_loss": yv})
+                    is_training = False
+                    eval_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = is_training, label_dict = {"ce_loss": yv})
+                    eval_feed_dict[qflg] = is_training
                     ans_mat = sess.run(network.get_layer("answer"), feed_dict = eval_feed_dict)
                     acc = np.average(np.argmax(ans_mat, axis = 1) == np.argmax(yv, axis = 1))
                     print("[epoch={e}/{et}][batch={b}/{bt}] acc={acc}".format(e = epoch, et = epoch_num, b = batch_cnt, bt = x.shape[0], acc = acc))
