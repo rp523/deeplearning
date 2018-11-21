@@ -145,12 +145,6 @@ class ImageNetwork:
             self.stride_x = stride_x
             self.padding  = padding
 
-    def add_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
-        input_layer = self.get_input(input_name)
-        assert(input_layer is not None)
-        new_layer = self.make_conv(input_layer, filter_param, output_ch, dtype, weight, bias)
-        self.add_layer(new_layer)
-    
     def make_conv_weight(self, filter_param, input_ch, output_ch, dtype = None):
         weight = tf.get_variable("conv_filter{}".format(len(self.__layer_list)),
                                   shape = [filter_param.kernel_y, filter_param.kernel_x, input_ch, output_ch],
@@ -165,7 +159,9 @@ class ImageNetwork:
                                dtype = self.__get_dtype(dtype))
         return bias
     
-    def make_conv(self, input_layer, filter_param, output_ch, name = None, dtype = None, weight = None, bias = None):
+    def add_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
+        input_layer = self.get_input(input_name)
+        assert(input_layer is not None)
         assert(len(input_layer.get_shape()) == 4)
     
         input_ch = int(input_layer.get_shape()[-1])
@@ -181,7 +177,7 @@ class ImageNetwork:
         new_layer = new_layer + bias
         new_layer = tf.identity(new_layer, name = name)
         self.__weight_list.append(weight)
-        return new_layer
+        self.add_layer(new_layer)
 
     def add_pool(self, pool_type, filter_param, name = None, input_name = None):
         input_layer = self.get_input(input_name)
