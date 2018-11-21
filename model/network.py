@@ -145,10 +145,10 @@ class ImageNetwork:
             self.stride_x = stride_x
             self.padding  = padding
 
-    def add_conv(self, filter_param, output_ch, bias = True, name = None, input_name = None, dtype = None):
+    def add_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
         input_layer = self.get_input(input_name)
         assert(input_layer is not None)
-        new_layer = self.make_conv(input_layer, filter_param, output_ch, bias, dtype)
+        new_layer = self.make_conv(input_layer, filter_param, output_ch, dtype, weight, bias)
         self.add_layer(new_layer)
     
     def make_conv_weight(self, filter_param, input_ch, output_ch, dtype = None):
@@ -158,7 +158,7 @@ class ImageNetwork:
                                   dtype = self.__get_dtype(dtype))
         return weight
     
-    def make_conv_bias(self, filter_param, input_ch, output_ch, dtype = None, weight = None, bias = None):
+    def make_conv_bias(self, output_ch, dtype = None):
         bias = tf.get_variable("conv_bias{}".format(len(self.__layer_list)),
                                shape = [output_ch],
                                initializer = tf.contrib.layers.xavier_initializer(),
@@ -173,12 +173,13 @@ class ImageNetwork:
         if weight is None:
             weight = self.make_conv_weight(filter_param, input_ch, output_ch, dtype)
         if bias is None:
-            bias   = self.make_conv_bias(  filter_param, input_ch, output_ch, dtype)
+            bias   = self.make_conv_bias(output_ch, dtype)
         new_layer   = tf.nn.conv2d(input = input_layer,
                                  filter = weight,
                                  strides=[1, filter_param.stride_y, filter_param.stride_x, 1],
                                  padding = self.__get_padding_str(filter_param.padding))
         new_layer = new_layer + bias
+        new_layer = tf.identity(new_layer, name = name)
         self.__weight_list.append(weight)
         return new_layer
 
