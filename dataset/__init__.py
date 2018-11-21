@@ -27,6 +27,7 @@ class Dataset:
         self.label_dict["trailer"      ] = len(self.label_dict.keys()) + 1
         self.label_dict["train"        ] = len(self.label_dict.keys()) + 1
         self.label_dict["motorcycle"   ] = len(self.label_dict.keys()) + 1
+        self.label_dict["special"      ] = len(self.label_dict.keys()) + 1
         
         self.label_dict["building"     ] = len(self.label_dict.keys()) + 1
         self.label_dict["wall"         ] = len(self.label_dict.keys()) + 1
