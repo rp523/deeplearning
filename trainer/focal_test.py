@@ -268,8 +268,6 @@ def focal_trial():
            (pcname == "Yusuke-PC"):
             train_type = "debug"
             val_type = "debug"
-    result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-    os.makedirs(result_dir)
     
     if 0:   # ポジティブ判定が出たアンカーを描画
         pal = []
@@ -343,6 +341,8 @@ def focal_trial():
          restore_path)
         exit()
 
+    result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+    os.makedirs(result_dir)
     with tf.Session() as sess:
         tf.summary.FileWriter(os.path.join(result_dir, "graph"), sess.graph)
         saver = tf.train.Saver()
