@@ -253,9 +253,23 @@ def make_vertices_summary_img(data_type, tgt_labels):
         rgb_arr, rect_labels, rects, poly_labels, polygons = e.get_vertices_data(data_type, index = i, flip = True)
         e.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}_flip.png".format(i)))
-        
-if __name__ == "__main__":
+
+def check_matching(json_dir_path, img_dir_path, ext = ".jpg"):
+    assert(os.path.exists(json_dir_path))
+    assert(os.path.isdir(json_dir_path))
+    assert(os.path.exists(img_dir_path))
+    assert(os.path.isdir(img_dir_path))
+    for json_path in fileio.get_file_list(json_dir_path):
+        json_name = fileio.get_file_name(json_path)
+        img_name = json_name.replace(".json", ext)
+        img_path = os.path.join(img_dir_path, img_name)
+        if not os.path.exists(img_path):
+            print(img_path)
+
+def main():
     tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
     make_vertices_summary_img("train", tgt_words_list)
+if __name__ == "__main__":
+    main()
     print("Done.")
