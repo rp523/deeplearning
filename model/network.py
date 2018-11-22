@@ -32,6 +32,7 @@ class ImageNetwork:
         self.__label_dict = {}
         
         self.__weight_list = []
+        self.__bias_list = []
         self.__anchor = {}
         self.__anchor_ph = {}
         
@@ -146,17 +147,19 @@ class ImageNetwork:
             self.padding  = padding
 
     def make_conv_weight(self, filter_param, input_ch, output_ch, dtype = None):
-        weight = tf.get_variable("conv_filter{}".format(len(self.__layer_list)),
+        weight = tf.get_variable("conv_filter{}".format(len(self.__weight_list)),
                                   shape = [filter_param.kernel_y, filter_param.kernel_x, input_ch, output_ch],
                                   initializer = tf.contrib.layers.xavier_initializer(),
                                   dtype = self.__get_dtype(dtype))
+        self.__weight_list.append(weight)
         return weight
     
     def make_conv_bias(self, output_ch, dtype = None):
-        bias = tf.get_variable("conv_bias{}".format(len(self.__layer_list)),
+        bias = tf.get_variable("conv_bias{}".format(len(self.__bias_list)),
                                shape = [output_ch],
                                initializer = tf.contrib.layers.xavier_initializer(),
                                dtype = self.__get_dtype(dtype))
+        self.__bias_list.append(bias)
         return bias
     
     def add_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
@@ -170,13 +173,13 @@ class ImageNetwork:
             weight = self.make_conv_weight(filter_param, input_ch, output_ch, dtype)
         if bias is None:
             bias   = self.make_conv_bias(output_ch, dtype)
-        new_layer   = tf.nn.conv2d(input = input_layer,
-                                 filter = weight,
-                                 strides=[1, filter_param.stride_y, filter_param.stride_x, 1],
-                                 padding = self.__get_padding_str(filter_param.padding))
-        new_layer = new_layer + bias
+        with tf.variable_scope("convs", reuse = (weight in self.__weight_list)):
+            new_layer   = tf.nn.conv2d(input = input_layer,
+                                     filter = weight,
+                                     strides=[1, filter_param.stride_y, filter_param.stride_x, 1],
+                                     padding = self.__get_padding_str(filter_param.padding))
+            new_layer = new_layer + bias
         new_layer = tf.identity(new_layer, name = name)
-        self.__weight_list.append(weight)
         self.add_layer(new_layer)
 
     def add_pool(self, pool_type, filter_param, name = None, input_name = None):
@@ -250,8 +253,8 @@ class ImageNetwork:
         self.add_conv(filter_param, output_ch, bias, input_name = input_name)
         self.add_batchnorm(global_norm, name)
 
-    def add_conv_batchnorm_act(self, filter_param, output_ch, activatioin_type, bias = True, global_norm = True, name = None, input_name = None):
-        self.add_conv(filter_param, output_ch, bias, input_name = input_name)
+    def add_conv_batchnorm_act(self, filter_param, output_ch, activatioin_type, global_norm = True, name = None, input_name = None, weight = None, bias = None):
+        self.add_conv(filter_param = filter_param, output_ch = output_ch, input_name = input_name, weight = weight, bias = bias)
         self.add_batchnorm(global_norm)
         self.add_activation(activatioin_type, name)
 
@@ -275,6 +278,11 @@ class ImageNetwork:
                            name = name)
         self.add_layer(new_layer)
     
+    def add_identity(self, name, input_name = None):
+        input_layer = self.get_input(input_name)
+        new_layer = tf.identity(input = input_layer, name = name)
+        self.add_layer(new_layer)
+
     def get_total_loss(self, weight_decay = None):
         loss = tf.Variable(0.0, dtype = tf.float32)
         for v in self.__loss_dict.values():

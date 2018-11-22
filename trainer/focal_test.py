@@ -111,56 +111,63 @@ def focal_net(img_h,
     network.add_upsample(2, 2, name = "bottomup_2")
     network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, input_name = "e1_1")
     network.add_injection(injection_name = "bottomup_2", name = "c2")
+    
+    cls_ch = anchor_size.size * \
+             anchor_asp.size * \
+             anchor_offset_y.size * \
+             anchor_offset_x.size * \
+             (1 + len(tgt_words_list))
+    reg_ch = anchor_size.size * \
+             anchor_asp.size * \
+             anchor_offset_y.size * \
+             anchor_offset_x.size * \
+             4
+    cls_weight1 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                       input_ch = 256, output_ch = 256)
+    cls_weight2 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                       input_ch = 256, output_ch = cls_ch)
+    cls_bias1 = network.make_conv_bias(output_ch = 256)
+    cls_bias2 = network.make_conv_bias(output_ch = cls_ch)
 
-    for i in range(2, 5 + 1):
+    reg_weight1 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                       input_ch = 256, output_ch = 256)
+    reg_weight2 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                       input_ch = 256, output_ch = reg_ch)
+    reg_bias1 = network.make_conv_bias(output_ch = 256)
+    reg_bias2 = network.make_conv_bias(output_ch = reg_ch)
+
+    for i in range(4):
+        feature_layer_name = "c{}".format(i + 2)
         # classificatin
-        feature_layer_name = "c{}".format(i)
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
-        for l in range(4):
-            network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size *
-                                                                                   anchor_asp.size *
-                                                                                   anchor_offset_y.size *
-                                                                                   anchor_offset_x.size *
-                                                                                   (1 + len(tgt_words_list)), "relu")
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight1, bias = cls_bias1, activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight2, bias = cls_bias2, activatioin_type = "relu", output_ch = cls_ch)
         network.add_reshape(shape = [-1,
                                      int(network.get_input(None).get_shape().as_list()[1]),
                                      int(network.get_input(None).get_shape().as_list()[2]),
-                                     anchor_size.size *
-                                     anchor_asp.size *
-                                     anchor_offset_y.size *
-                                     anchor_offset_x.size,
+                                     cls_ch // (1 + len(tgt_words_list)),
                                      1 + len(tgt_words_list)])
-        network.add_softmax(name = "cls{}".format(i))
+        network.add_softmax(name = "cls{}".format(i + 2))
         # regression
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu", input_name = feature_layer_name)
-        for l in range(4 - 1 - 1):
-            network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), 256, "relu")
-        network.add_conv_batchnorm_act(ImageNetwork.FilterParam(3, 3, 1, 1, True), anchor_size.size *
-                                                                                   anchor_asp.size *
-                                                                                   anchor_offset_y.size *
-                                                                                   anchor_offset_x.size * 4,
-                                                                                   "relu")
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight1, bias = reg_bias1, activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight2, bias = reg_bias2, activatioin_type = "relu", output_ch = cls_ch)
         network.add_reshape(shape = [-1,
-                                     network.get_input(None).get_shape().as_list()[1],
-                                     network.get_input(None).get_shape().as_list()[2],
-                                     anchor_size.size *
-                                     anchor_asp.size *
-                                     anchor_offset_y.size *
-                                     anchor_offset_x.size,
-                                     4],
-                                     name = "reg{}".format(i))
-        network.add_rect_loss(name = "loss{}".format(i),
+                                     int(network.get_input(None).get_shape().as_list()[1]),
+                                     int(network.get_input(None).get_shape().as_list()[2]),
+                                     reg_ch // 4,
+                                     4])
+        network.add_identity(name = "reg{}".format(i + 2))
+        # loss
+        network.add_rect_loss(name = "loss{}".format(i + 2),
                               gamma = 2.0,
                               alpha = 0.5,
                               size_list = anchor_size,
                               asp_list = anchor_asp,
                               offset_y_list = anchor_offset_y,
                               offset_x_list = anchor_offset_x,
-                              cls_layer_name = "cls{}".format(i),
-                              reg_layer_name = "reg{}".format(i),
-                              cls_label_name = "cls_label{}".format(i),
-                              reg_label_name = "reg_label{}".format(i))
+                              cls_layer_name = "cls{}".format(i + 2),
+                              reg_layer_name = "reg{}".format(i + 2),
+                              cls_label_name = "cls_label{}".format(i + 2),
+                              reg_label_name = "reg_label{}".format(i + 2))
     
     return network
 
@@ -250,7 +257,7 @@ def focal_trial():
     val_type = "val"
     log_interval_sec = 60 * 30
     restore_path = None#r""
-    if 0:
+    if 1:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
