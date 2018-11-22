@@ -4,7 +4,10 @@ import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
 sys.path.append("../")
+
 from dataset.bdd100k import BDD100k
+from dataset.edgeAI_detection import EdgeAIdetection
+
 from model.network import ImageNetwork
 from transformer import *
 from trainer import Trainer
@@ -34,11 +37,11 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg
     
     return feed_dict
 
-def calc_class_freq(network, bdd, dat_type, tgt_words_list, reg_label_name_list, pos_th, neg_th):
+def calc_class_freq(network, data, dat_type, tgt_words_list, reg_label_name_list, pos_th, neg_th):
     cls_num = len(tgt_words_list) + 1
     cnt = np.zeros(cls_num).astype(np.uint32)
-    for b in tqdm(range(bdd.get_sample_num(dat_type))):
-        _0, rect_labels, rects, _1, _2 = bdd.get_vertices_data(dat_type, tgt_words_list, index = b)
+    for b in tqdm(range(data.get_sample_num(dat_type))):
+        _0, rect_labels, rects, _1, _2 = data.get_vertices_data(dat_type, tgt_words_list, index = b)
         for reg_label_name in reg_label_name_list:
             _, anchor = network.get_anchor(reg_label_name)
             cls, _ = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
@@ -248,7 +251,8 @@ def focal_trial():
     pos_th = 0.5
     neg_th = 0.4
     
-    bdd = BDD100k(resized_h = img_h,
+#    data = BDD100k(resized_h = img_h,
+    data = EdgeAIdetection(resized_h = img_h,
                   resized_w = img_w)
     total_loss = network.get_total_loss(weight_decay = 1E-4)
     optimizer = tf.train.AdamOptimizer(learning_rate = lr).minimize(total_loss)
@@ -257,7 +261,7 @@ def focal_trial():
     val_type = "val"
     log_interval_sec = 60 * 30
     restore_path = None#r""
-    if 1:
+    if 0:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
@@ -267,7 +271,7 @@ def focal_trial():
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     os.makedirs(result_dir)
     
-    if 0:
+    if 0:   # ポジティブ判定が出たアンカーを描画
         pal = []
         pal.append((0,0,255))
         pal.append((255,0,0))
@@ -275,8 +279,8 @@ def focal_trial():
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
         with tf.Session() as sess:
-            for i in tqdm(range(bdd.get_sample_num(train_type))):
-                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = i)
+            for i in tqdm(range(data.get_sample_num(train_type))):
+                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i)
                 pil_img = Image.fromarray(img_arr.astype(np.uint8))
                 draw = ImageDraw.Draw(pil_img)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
@@ -300,7 +304,7 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    if 0:
+    if 0:   # アンカーが割り当てられたポジティブを描画
         pal = []
         pal.append((0,0,255))
         pal.append((255,0,0))
@@ -308,8 +312,8 @@ def focal_trial():
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
         with tf.Session() as sess:
-            for i in tqdm(range(bdd.get_sample_num(train_type))):
-                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list, index = i, flip = False)
+            for i in tqdm(range(data.get_sample_num(train_type))):
+                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = False)
                 pil_img = Image.fromarray(img_arr.astype(np.uint8))
                 draw = ImageDraw.Draw(pil_img)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
@@ -334,7 +338,7 @@ def focal_trial():
         if not os.path.exists(dst_pred_dir):
             os.makedirs(dst_pred_dir)
         evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, val_type,
-         bdd, tgt_words_list, 
+         data, tgt_words_list, 
          dst_pred_dir,
          restore_path)
         exit()
@@ -362,11 +366,11 @@ def focal_trial():
             return dst_model_dir
         
         for epoch in range(epoch_num):
-            for b in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
+            for b in tqdm(range(data.get_sample_num(train_type) // batch_size)):
                 
                 # one image
                 rect_labels = np.empty(0)
-                img_arr, rect_labels, rects, _1, _2 = bdd.get_vertices_data(train_type, tgt_words_list)
+                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
@@ -384,7 +388,7 @@ def focal_trial():
                         if os.path.isdir(dst_pred_dir):
                             if tmp_out is False:
                                 evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, val_type,
-                                         bdd, tgt_words_list, dst_pred_dir,
+                                         data, tgt_words_list, dst_pred_dir,
                                          restore_path = save_model(epoch, b))
                                 tmp_out = True
                     else:
