@@ -331,7 +331,7 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    if 1:	# evaluate-only
+    if 0:	# evaluate-only
         dst_pred_dir = r"C:\Users\Yusuke\workspace\tmp_out"
         restore_path = r"C:\Users\Yusuke\workspace\deeplearning\result_20181122_230555\model\epoch0000_batch20588"
         if not os.path.exists(dst_pred_dir):
