@@ -26,11 +26,11 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg
                                               anchor.shape[1],
                                               anchor.shape[2],
                                               anchor.shape[3])
-
-        cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
-        tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
-        label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
-        label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
+        if (not rect_labels is None):
+            cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
+            tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
+            label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
+            label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
     feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_arr.shape[0], img_arr.shape[1], img_arr.shape[2]),
                                               label_dict = label_dict,
                                               is_training = True))
@@ -259,6 +259,7 @@ def focal_trial():
     
     train_type = "train"
     val_type = "val"
+    test_type = "test"
     log_interval_sec = 60 * 30
     restore_path = None#r""
     if 0:
@@ -330,12 +331,12 @@ def focal_trial():
                 pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
         exit()
     
-    if 0:	# evaluate-only
+    if 1:	# evaluate-only
         dst_pred_dir = r"C:\Users\Yusuke\workspace\tmp_out"
-        restore_path = r"C:\Users\Yusuke\workspace\model"
+        restore_path = r"C:\Users\Yusuke\workspace\deeplearning\result_20181122_230555\model\epoch0000_batch20588"
         if not os.path.exists(dst_pred_dir):
             os.makedirs(dst_pred_dir)
-        evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, val_type,
+        evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, test_type,
          data, tgt_words_list, 
          dst_pred_dir,
          restore_path)
