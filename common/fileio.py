@@ -20,14 +20,9 @@ def get_file_list(tgt_dir,
                   tgt_ext = None,
                   only_name = None,
                   max_num = None,
-                  recursive = True,
-                  recursive_base = []):
+                  recursive = True):
     # 着目しているディレクトリ以下のファイルを全取得する
-    if max_num is not None:
-        if len(recursive_base) >= max_num:
-                return recursive_base
-
-    ret = recursive_base
+    ret = []
     for item_name in os.listdir(tgt_dir):
         item_path = os.path.join(tgt_dir, item_name)
         if os.path.isfile(item_path):
@@ -62,6 +57,9 @@ def get_file_list(tgt_dir,
                                           max_num = max_num,
                                           recursive_base = ret,
                                           recursive = recursive)
+    if not max_num is None:
+        if len(ret) > max_num:
+            ret = ret[:max_num]
     return ret
 
 if __name__ == "__main__":
