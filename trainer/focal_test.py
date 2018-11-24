@@ -115,6 +115,7 @@ def focal_net(img_h,
     network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, input_name = "e1_1")
     network.add_injection(injection_name = "bottomup_2", name = "c2")
     
+    sub_layer_num = 4
     cls_ch = anchor_size.size * \
              anchor_asp.size * \
              anchor_offset_y.size * \
@@ -129,7 +130,7 @@ def focal_net(img_h,
     cls_bias_list = []
     reg_weight_list = []
     reg_bias_list = []
-    for l in range(4):
+    for l in range(sub_layer_num):
         cls_weight_list.append(network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
                                                         input_ch = 256, output_ch = 256))
         cls_bias_list.append(network.make_conv_bias(output_ch = 256))
@@ -147,7 +148,7 @@ def focal_net(img_h,
         feature_layer_name = "c{}".format(i + 2)
         # classificatin
         network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight_list[0], bias = cls_bias_list[0], activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
-        for l in range(1, 4):
+        for l in range(1, sub_layer_num):
             network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight_list[l], bias = cls_bias_list[l], activatioin_type = "relu", output_ch = 256)
         network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight, bias = cls_bias, activatioin_type = "relu", output_ch = cls_ch)
         network.add_reshape(shape = [-1,
@@ -158,7 +159,7 @@ def focal_net(img_h,
         network.add_softmax(name = "cls{}".format(i + 2))
         # regression
         network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight_list[0], bias = reg_bias_list[0], activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
-        for l in range(1, 4):
+        for l in range(1, sub_layer_num):
             network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight_list[l], bias = reg_bias_list[l], activatioin_type = "relu", output_ch = 256)
         network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight, bias = reg_bias, activatioin_type = "relu", output_ch = reg_ch)
         network.add_reshape(shape = [-1,
