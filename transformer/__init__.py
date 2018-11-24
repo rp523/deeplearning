@@ -108,8 +108,11 @@ def encode_anchor_label(label_vec, label_rect_mat, anchor, pos_iou_th, neg_iou_t
 def decode_anchor_prediction(anchor_cls, anchor_reg_t,
                              offset_y_list, offset_x_list, size_list, asp_list,
                              thresh = 0.5):
-    assert((anchor_cls.shape[-4:-2] == anchor_reg_t.shape[-4:-2]))
-    base_anchor = make_anchor(anchor_cls.shape[-4:-4+2],
+    if anchor_cls.shape[0] == 1:
+        anchor_cls = np.reshape(anchor_cls, anchor_cls.shape[1:])
+    if anchor_reg_t.shape[0] == 1:
+        anchor_reg_t = np.reshape(anchor_reg_t, anchor_reg_t.shape[1:])
+    base_anchor = make_anchor(anchor_cls.shape[0:2],
                               offset_y_list = offset_y_list,
                               offset_x_list = offset_x_list,
                               size_list = size_list,

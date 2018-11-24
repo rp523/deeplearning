@@ -317,6 +317,7 @@ def focal_trial():
         pal.append((255,0,0))
         pal.append((0,255,0))
         dst_dir = "assigned_rect"
+        cls_num = 1 + len(tgt_words_list)
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
         with tf.Session() as sess:
@@ -328,16 +329,23 @@ def focal_trial():
                     learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
                     # visualize anchored label
                     for l in range(2, 5 + 1):
-                        cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
-                        reg = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict)
-                        reg = reg[cls > 0]
-                        cls = cls[cls > 0]
+                        cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(tf.one_hot(network._ImageNetwork__label_dict["cls_label{}".format(l)], depth = cls_num), feed_dict = learn_feed_dict),
+                                                                    anchor_reg_t = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict),
+                                                                    size_list = anchor_size,
+                                                                    asp_list = anchor_asp,
+                                                                    offset_y_list = anchor_offset_y,
+                                                                    offset_x_list = anchor_offset_x,
+                                                                    thresh = 0.5)
                         for j in range(cls.size):
-                            draw.rectangle((reg[j][1] * img_w,
-                                            reg[j][0] * img_h,
-                                            reg[j][3] * img_w,
-                                            reg[j][2] * img_h),
-                                            outline = pal[cls[j] - 1])
+                            if cls[j] != 0:
+                                draw.rectangle((rect[j][1] * img_w,
+                                                rect[j][0] * img_h,
+                                                rect[j][3] * img_w,
+                                                rect[j][2] * img_h),
+                                                outline = pal[cls[j] - 1])
+                                draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                          text = "{:.2f}".format(score[j]),
+                                          fill = pal[cls[j] - 1])
                     pil_img.save(os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png"))
         exit()
     
