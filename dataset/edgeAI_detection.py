@@ -44,13 +44,8 @@ class EdgeAIdetection(Dataset):
         if data_type == "debug":
             max_num = 100
             data_type = "test"
-        if not data_type in self.__json_path_dict.keys():
-            json_dir_path = os.path.join(self.__data_path, "dtc_{}_annotations".format(data_type))
-            if os.path.exists(json_dir_path):
-                assert(os.path.isdir(json_dir_path))
-                self.__json_path_dict[data_type] = fileio.get_file_list(tgt_dir = json_dir_path,
-                                                                        tgt_ext = ".json",
-                                                                        max_num = max_num)
+        
+        # RGB image
         if not data_type in self.__rgb_path_dict.keys():
             rgb_dir_path = os.path.join(self.__data_path, "dtc_{}_images".format(data_type))
             assert(os.path.exists(rgb_dir_path))
@@ -58,7 +53,30 @@ class EdgeAIdetection(Dataset):
             rgb_path_list = fileio.get_file_list(tgt_dir = rgb_dir_path,
                                                  tgt_ext = ".jpg",
                                                  max_num = max_num)
+            rgb_path_list.sort()
             self.__rgb_path_dict[data_type] = rgb_path_list
+        
+        # JSON
+        if not data_type in self.__json_path_dict.keys():
+            json_dir_path = os.path.join(self.__data_path, "dtc_{}_annotations".format(data_type))
+            if os.path.exists(json_dir_path):
+                assert(os.path.isdir(json_dir_path))
+                json_path_list = fileio.get_file_list(tgt_dir = json_dir_path,
+                                                      tgt_ext = ".json",
+                                                      max_num = max_num)
+                json_path_list.sort()
+                self.__json_path_dict[data_type] = json_path_list
+                
+                # matching check
+                assert(len(self.__rgb_path_dict[data_type]) == len(self.__json_path_dict[data_type]))
+                for i, json_path in enumerate(self.__json_path_dict[data_type]):
+                    json_name = fileio.get_file_name(json_path)
+                    json_key = json_name[:-len(".json")]
+                    rgb_path = self.__rgb_path_dict[data_type][i]
+                    rgb_name = fileio.get_file_name(rgb_path)
+                    rgb_key = rgb_name[:-len(".jpg")]
+                    assert(rgb_key == json_key)
+
         return data_type
     
     def get_sample_num(self, data_type):
@@ -78,7 +96,6 @@ class EdgeAIdetection(Dataset):
         polygons = None
         if data_type in self.__json_path_dict.keys():
             json_path = self.__json_path_dict[data_type][index]
-    
             info = json.load(open(json_path))
             obj_list = info["labels"]
             
