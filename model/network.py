@@ -47,7 +47,6 @@ class ImageNetwork:
                                        shape = [None, image_h, image_w, image_ch],
                                        name = "input_image")
         self.__layer_list = [src_img_layer]
-        self.__total_loss = None
         self.__is_training = tf.placeholder(dtype = tf.bool)
         
     def __get_padding_str(self, padding):
@@ -282,28 +281,12 @@ class ImageNetwork:
         new_layer = tf.identity(input = input_layer, name = name)
         self.add_layer(new_layer)
 
-    def get_total_loss(self, weight_decay = None):
-        if self.__total_loss is None:
-            loss = tf.Variable(0.0, dtype = tf.float32)
-            for k, v in self.__loss_dict.items():
-                s = tf.get_variable("{}_weight".format(k),
-                                    shape = [1],
-                                    initializer = tf.contrib.layers.xavier_initializer(),
-                                    dtype = self.__get_dtype(None))
-                # weighting rule below is cited from: https://arxiv.org/abs/1705.07115
-                if k.find("cls") >= 0:
-                    loss = loss + (tf.exp(-s) * v + 0.5 * s)
-                elif k.find("reg") >= 0:
-                    loss = loss + (0.5 * tf.exp(-s) * v + 0.5 * s)
-                else:
-                    print(k)
-                    assert(0)
-            if weight_decay is not None:
-                for weight in self.__weight_list:
-                    loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
-            self.__total_loss = loss
-        return self.__total_loss
+    def get_loss_dict(self):
+        return self.__loss_dict
     
+    def get_weight_list(self):
+        return self.__weight_list
+
     def add_loss(self, loss_type, name, input_name = None, gamma = None):
         pred_layer = self.get_input(input_name)
         # lossはすべてfloat32
