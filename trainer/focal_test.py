@@ -59,7 +59,7 @@ def focal_net(img_h,
               anchor_offset_x,
               tgt_words_list):
     
-    network = ImageNetwork(img_h, img_w, img_ch)
+    network = ImageNetwork(img_h, img_w, img_ch, random_seed = None)
     
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(7, 7, 2, 2, True), 32, "relu")
     
@@ -125,25 +125,31 @@ def focal_net(img_h,
              anchor_offset_y.size * \
              anchor_offset_x.size * \
              4
-    cls_weight1 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
-                                       input_ch = 256, output_ch = 256)
-    cls_weight2 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
-                                       input_ch = 256, output_ch = cls_ch)
-    cls_bias1 = network.make_conv_bias(output_ch = 256)
-    cls_bias2 = network.make_conv_bias(output_ch = cls_ch)
-
-    reg_weight1 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
-                                       input_ch = 256, output_ch = 256)
-    reg_weight2 = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+    cls_weight_list = []
+    cls_bias_list = []
+    reg_weight_list = []
+    reg_bias_list = []
+    for l in range(4):
+        cls_weight_list.append(network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                                        input_ch = 256, output_ch = 256))
+        cls_bias_list.append(network.make_conv_bias(output_ch = 256))
+        reg_weight_list.append(network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                                        input_ch = 256, output_ch = 256))
+        reg_bias_list.append(network.make_conv_bias(output_ch = 256))
+    cls_weight = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
+                                          input_ch = 256, output_ch = cls_ch)
+    cls_bias = network.make_conv_bias(output_ch = cls_ch)
+    reg_weight = network.make_conv_weight(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True),
                                        input_ch = 256, output_ch = reg_ch)
-    reg_bias1 = network.make_conv_bias(output_ch = 256)
-    reg_bias2 = network.make_conv_bias(output_ch = reg_ch)
+    reg_bias = network.make_conv_bias(output_ch = reg_ch)
 
     for i in range(4):
         feature_layer_name = "c{}".format(i + 2)
         # classificatin
-        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight1, bias = cls_bias1, activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
-        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight2, bias = cls_bias2, activatioin_type = "relu", output_ch = cls_ch)
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight_list[0], bias = cls_bias_list[0], activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
+        for l in range(1, 4):
+            network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight_list[l], bias = cls_bias_list[l], activatioin_type = "relu", output_ch = 256)
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = cls_weight, bias = cls_bias, activatioin_type = "relu", output_ch = cls_ch)
         network.add_reshape(shape = [-1,
                                      int(network.get_input(None).get_shape().as_list()[1]),
                                      int(network.get_input(None).get_shape().as_list()[2]),
@@ -151,8 +157,10 @@ def focal_net(img_h,
                                      1 + len(tgt_words_list)])
         network.add_softmax(name = "cls{}".format(i + 2))
         # regression
-        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight1, bias = reg_bias1, activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
-        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight2, bias = reg_bias2, activatioin_type = "relu", output_ch = cls_ch)
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight_list[0], bias = reg_bias_list[0], activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
+        for l in range(1, 4):
+            network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight_list[l], bias = reg_bias_list[l], activatioin_type = "relu", output_ch = 256)
+        network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight, bias = reg_bias, activatioin_type = "relu", output_ch = reg_ch)
         network.add_reshape(shape = [-1,
                                      int(network.get_input(None).get_shape().as_list()[1]),
                                      int(network.get_input(None).get_shape().as_list()[2]),
@@ -333,7 +341,7 @@ def focal_trial():
     
     if 0:	# evaluate-only
         dst_pred_dir = r"C:\Users\Yusuke\workspace\tmp_out"
-        restore_path = r"C:\Users\Yusuke\workspace\deeplearning\result_20181122_230555\model\epoch0000_batch20588"
+        restore_path = r"C:\Users\Yusuke\workspace\deeplearning\result_20181123_221648\model\epoch0000_batch6288"
         if not os.path.exists(dst_pred_dir):
             os.makedirs(dst_pred_dir)
         evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, test_type,
