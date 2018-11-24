@@ -280,63 +280,65 @@ def focal_trial():
     
     if 0:   # ポジティブ判定が出たアンカーを描画
         pal = []
-        pal.append((0,0,255))
         pal.append((255,0,0))
+        pal.append((0,255,0))
         dst_dir = "assigned_anchor"
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
         with tf.Session() as sess:
             for i in tqdm(range(data.get_sample_num(train_type))):
-                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i)
-                pil_img = Image.fromarray(img_arr.astype(np.uint8))
-                draw = ImageDraw.Draw(pil_img)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
-                # visualize anchored label
-                for l in range(2, 5 + 1):
-                    cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
-                    reg = make_anchor(network.get_layer("reg{}".format(l)).get_shape().as_list()[1:1+2],
-                                      size_list = anchor_size,
-                                      asp_list = anchor_asp,
-                                      offset_y_list = anchor_offset_y,
-                                      offset_x_list = anchor_offset_x)
-                    cls = cls.flatten()
-                    reg = reg[cls > 0]
-                    cls = cls[cls > 0]
-                    for j in range(cls.size):
-                        draw.rectangle((reg[j][1] * img_w,
-                                        reg[j][0] * img_h,
-                                        reg[j][3] * img_w,
-                                        reg[j][2] * img_h),
-                                        outline = pal[cls[j] - 1])
-                pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
+                for flip in [False, True]:
+                    img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
+                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_img)
+                    learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
+                    # visualize anchored label
+                    for l in range(2, 5 + 1):
+                        cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
+                        reg = make_anchor(network.get_layer("reg{}".format(l)).get_shape().as_list()[1:1+2],
+                                          size_list = anchor_size,
+                                          asp_list = anchor_asp,
+                                          offset_y_list = anchor_offset_y,
+                                          offset_x_list = anchor_offset_x)
+                        cls = cls.flatten()
+                        reg = reg[cls > 0]
+                        cls = cls[cls > 0]
+                        for j in range(cls.size):
+                            draw.rectangle((reg[j][1] * img_w,
+                                            reg[j][0] * img_h,
+                                            reg[j][3] * img_w,
+                                            reg[j][2] * img_h),
+                                            outline = pal[cls[j] - 1])
+                    pil_img.save(os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png"))
         exit()
     
     if 0:   # アンカーが割り当てられたポジティブを描画
         pal = []
-        pal.append((0,0,255))
         pal.append((255,0,0))
+        pal.append((0,255,0))
         dst_dir = "assigned_rect"
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
         with tf.Session() as sess:
             for i in tqdm(range(data.get_sample_num(train_type))):
-                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = False)
-                pil_img = Image.fromarray(img_arr.astype(np.uint8))
-                draw = ImageDraw.Draw(pil_img)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
-                # visualize anchored label
-                for l in range(2, 5 + 1):
-                    cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
-                    reg = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict)
-                    reg = reg[cls > 0]
-                    cls = cls[cls > 0]
-                    for j in range(cls.size):
-                        draw.rectangle((reg[j][1] * img_w,
-                                        reg[j][0] * img_h,
-                                        reg[j][3] * img_w,
-                                        reg[j][2] * img_h),
-                                        outline = pal[cls[j] - 1])
-                pil_img.save(os.path.join(dst_dir, "{0:05d}.png".format(i)))
+                for flip in [False, True]:
+                    img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
+                    pil_img = Image.fromarray(img_arr.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_img)
+                    learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
+                    # visualize anchored label
+                    for l in range(2, 5 + 1):
+                        cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
+                        reg = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict)
+                        reg = reg[cls > 0]
+                        cls = cls[cls > 0]
+                        for j in range(cls.size):
+                            draw.rectangle((reg[j][1] * img_w,
+                                            reg[j][0] * img_h,
+                                            reg[j][3] * img_w,
+                                            reg[j][2] * img_h),
+                                            outline = pal[cls[j] - 1])
+                    pil_img.save(os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png"))
         exit()
     
     if 0:	# evaluate-only
