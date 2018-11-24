@@ -224,7 +224,7 @@ def evaluate(network, img_h, img_w,
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 for val_idx in tqdm(range(val_data.get_sample_num(val_type))):
                     # one image
-                    img_arr, rect_labels, rects, _1, _2 = val_data.get_vertices_data(val_type, tgt_words_list, index = val_idx)
+                    img_arr, rect_labels, rects, _1, _2 = val_data.get_vertices_data(val_type, tgt_words_list, index = val_idx, flip = False)
                     eval_feed_dict = make_feed_dict(network = network, img_arr = img_arr, rect_labels = rect_labels, rects = rects, pos_th = 0, neg_th = 0, batch_size = 1)
                     #one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                     
@@ -418,7 +418,7 @@ def focal_trial():
                 
                 # one image
                 rect_labels = np.empty(0)
-                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list)
+                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = None, flip = None)
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
