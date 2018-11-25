@@ -50,22 +50,16 @@ def calc_class_freq(network, data, dat_type, tgt_words_list, reg_label_name_list
     return cnt / np.sum(cnt)
 
 def get_total_loss(network, weight_decay):
-    loss = tf.Variable(0.0, dtype = tf.float32)
+    loss = tf.constant(0.0, dtype = tf.float32)
 
-    cls_loss = None
-    reg_loss = None
+    cls_loss = tf.constant(0.0, dtype = tf.float32)
+    reg_loss = tf.constant(0.0, dtype = tf.float32)
     for k, v in network.get_loss_dict().items():
         # weighting rule below is cited from: https://arxiv.org/abs/1705.07115
         if k.find("cls") >= 0:
-            if cls_loss is None:
-                cls_loss = v
-            else:
-                cls_loss = cls_loss + v
+            cls_loss = cls_loss + v
         elif k.find("reg") >= 0:
-            if reg_loss is None:
-                reg_loss = v
-            else:
-                reg_loss = reg_loss + v
+            reg_loss = reg_loss + v
         else:
             print(k)
             assert(0)
@@ -424,8 +418,8 @@ def focal_trial():
                 learn_feed_dict[lr] = 1e-2
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
-                print(sess.run(total_loss, feed_dict = learn_feed_dict), end = "")
-                print(sess.run(loss_weight_vec, feed_dict = learn_feed_dict))
+                print(sess.run(total_loss, feed_dict = learn_feed_dict),
+                      sess.run(loss_weight_vec, feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
