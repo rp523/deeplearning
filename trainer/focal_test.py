@@ -52,30 +52,31 @@ def calc_class_freq(network, data, dat_type, tgt_words_list, reg_label_name_list
 def get_total_loss(network, weight_decay):
     loss = tf.Variable(0.0, dtype = tf.float32)
 
-    cls_loss = tf.Variable(0.0, dtype = tf.float32)
-    reg_loss = tf.Variable(0.0, dtype = tf.float32)
+    cls_loss = None
+    reg_loss = None
     for k, v in network.get_loss_dict().items():
         # weighting rule below is cited from: https://arxiv.org/abs/1705.07115
         if k.find("cls") >= 0:
-            cls_loss = cls_loss + v
+            if cls_loss is None:
+                cls_loss = v
+            else:
+                cls_loss = cls_loss + v
         elif k.find("reg") >= 0:
-            reg_loss = reg_loss + v
+            if reg_loss is None:
+                reg_loss = v
+            else:
+                reg_loss = reg_loss + v
         else:
             print(k)
             assert(0)
-    cls_s = tf.get_variable("cls_loss_weight".format(k),
-                            shape = [1],
-                            initializer = tf.contrib.layers.xavier_initializer(),
-                            dtype = tf.float32)
-    reg_s = tf.get_variable("reg_loss_weight".format(k),
-                            shape = [1],
-                            initializer = tf.contrib.layers.xavier_initializer(),
-                            dtype = tf.float32)
-    loss = loss + ((tf.exp(-cls_s) * cls_loss + 0.5 * cls_s)) + (0.5 * tf.exp(-reg_s) * reg_loss + 0.5 * reg_s)
+    cls_s = tf.Variable(0.0, dtype = tf.float32)
+    reg_s = tf.Variable(0.0, dtype = tf.float32)
+    loss = loss + (1.0 * tf.exp(- cls_s) * cls_loss + 0.5 * cls_s)
+    loss = loss + (0.5 * tf.exp(- reg_s) * reg_loss + 0.5 * reg_s)
     
     for weight in network.get_weight_list():
         loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
-    return loss, [cls_s, reg_s]
+    return loss, [tf.exp(-cls_s), cls_loss, 0.5 * tf.exp(-reg_s), reg_loss]
 
 
 def focal_net(img_h,
@@ -423,9 +424,9 @@ def focal_trial():
                 learn_feed_dict[lr] = 1e-2
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
-                #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                print(0.5 * np.exp(-(sess.run(loss_weight_vec[1], feed_dict = learn_feed_dict) - sess.run(loss_weight_vec[0], feed_dict = learn_feed_dict))))
-                if time.time() - start_time >= log_interval_sec:
+                print(sess.run(total_loss, feed_dict = learn_feed_dict), end = "")
+                print(sess.run(loss_weight_vec, feed_dict = learn_feed_dict))
+                if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
                     start_time = time.time()
