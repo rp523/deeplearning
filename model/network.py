@@ -378,9 +378,6 @@ class ImageNetwork:
     def get_anchor(self, name):
         return self.__anchor_ph[name], self.__anchor[name]
     
-    def get_loss_dict(self):
-        return self.__loss_dict
-        
     '''        
     def __get_optimizer(self, loss, optimizer_type, learning_rate):
         if optimizer_type == "adam":
