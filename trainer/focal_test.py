@@ -143,7 +143,7 @@ def focal_net(img_h,
     network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, input_name = "e1_1")
     network.add_injection(injection_name = "bottomup_2", name = "c2")
     
-    sub_layer_num = 4
+    sub_layer_num = 1
     cls_ch = anchor_size.size * \
              anchor_asp.size * \
              anchor_offset_y.size * \
@@ -424,7 +424,7 @@ def focal_trial():
                 
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 #learn_loss = sess.run(total_loss, feed_dict = learn_feed_dict);print(learn_loss)
-                #print(sess.run(loss_weight_vec, feed_dict = learn_feed_dict))
+                print(0.5 * np.exp(-(sess.run(loss_weight_vec[1], feed_dict = learn_feed_dict) - sess.run(loss_weight_vec[0], feed_dict = learn_feed_dict))))
                 if time.time() - start_time >= log_interval_sec:
                     # Save model
                     save_model(epoch, b)
@@ -436,7 +436,7 @@ def focal_trial():
                     if check:
                         if os.path.isdir(dst_pred_dir):
                             if tmp_out is False:
-                                evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, val_type,
+                                evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, train_type,
                                          data, tgt_words_list, dst_pred_dir,
                                          restore_path = save_model(epoch, b))
                                 tmp_out = True
