@@ -193,7 +193,7 @@ def focal_net(img_h,
         network.add_identity(name = "reg{}".format(i + 2))
         # loss
         network.add_rect_loss(name = "loss{}".format(i + 2),
-                              gamma = 2.0,
+                              gamma = 5.0,
                               alpha = 0.5,
                               size_list = anchor_size,
                               asp_list = anchor_asp,
@@ -225,8 +225,8 @@ def evaluate(network, img_h, img_w,
                     
                     # output prediction image
                     pal = []
-                    pal.append((0,0,255))
                     pal.append((255,0,0))
+                    pal.append((0,255,0))
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
                     for i in range(2, 5 + 1):
@@ -417,9 +417,7 @@ def focal_trial():
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
-                sess.run(optimizer, feed_dict = learn_feed_dict)
-                print(sess.run(total_loss, feed_dict = learn_feed_dict),
-                      sess.run(loss_weight_vec, feed_dict = learn_feed_dict))
+                print(sess.run([optimizer, total_loss, loss_weight_vec], feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
