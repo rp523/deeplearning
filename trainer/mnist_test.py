@@ -24,7 +24,6 @@ def mnist_trial():
         y = sign * (2 ** (y - N))
         y = tf.reshape(x, x.get_shape())
         return y
-    qflg = tf.placeholder(dtype = tf.bool)
     network = ImageNetwork(image_h = 28,
                            image_w = 28,
                            image_ch = 1,
@@ -37,20 +36,10 @@ def mnist_trial():
         input_ch = network.get_input(None).get_shape().as_list()[3]
         weight = network.make_conv_weight(filter_param, input_ch = input_ch, output_ch = output_ch)
         bias   = network.make_conv_bias(output_ch = output_ch)
-        q_weight = quantize(weight)
-        print(weight, q_weight)
-        weight = tf.cond(qflg, lambda:weight, lambda:q_weight)
-        q_bias = quantize(bias)
-        bias = tf.cond(qflg, lambda:bias, lambda:q_bias)
         network.add_conv(filter_param, output_ch, weight = weight, bias = bias)
-        layer = network.get_input(None)
-        q_layer = quantize(layer)
-        network.add_layer(tf.cond(qflg, lambda:layer, lambda:q_layer))
-        network.add_batchnorm()
+        
+        network.add_groupnorm(group_div = 16)
         network.add_activation("relu")
-        layer = network.get_input(None)
-        q_layer = quantize(layer)
-        network.add_layer(tf.cond(qflg, lambda:layer, lambda:q_layer))
     
     network.add_full_connect(1024)
     network.add_activation("relu")
@@ -61,8 +50,10 @@ def mnist_trial():
     network.add_loss("cross_entropy", name = "ce_loss")
     #network.show()
     
-    total_loss = network.get_total_loss(weight_decay = 1E-4)
-    batch_size = 16
+    total_loss = tf.constant(0.0)
+    for loss in network.get_loss_dict().values():
+        total_loss += loss
+    batch_size = 8
     epoch_num = 100
     lr = 1e-4
     x, y = mnist.get_data("train")
@@ -80,12 +71,10 @@ def mnist_trial():
                 batch_idx = np.random.choice(np.arange(x.shape[0]), batch_size, replace = True)
                 is_training = True
                 learn_feed_dict = network.create_feed_dict(input_image = x[batch_idx] / 128 - 0.5, is_training = is_training, label_dict = {"ce_loss": y[batch_idx]})
-                learn_feed_dict[qflg] = is_training
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 if b % 10 == 0:
                     is_training = False
                     eval_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = is_training, label_dict = {"ce_loss": yv})
-                    eval_feed_dict[qflg] = is_training
                     ans_mat = sess.run(network.get_layer("answer"), feed_dict = eval_feed_dict)
                     acc = np.average(np.argmax(ans_mat, axis = 1) == np.argmax(yv, axis = 1))
                     print("[epoch={e}/{et}][batch={b}/{bt}] acc={acc}".format(e = epoch, et = epoch_num, b = batch_cnt, bt = x.shape[0], acc = acc))

@@ -243,6 +243,21 @@ class ImageNetwork:
                                               name = name)
         self.add_layer(new_layer)
     
+    def add_groupnorm(self, group_div, name = None, input_name = None, dtype = None):
+        input_layer = self.get_input(input_name)
+        N, H, W, C = input_layer.get_shape()
+        print(input_layer.get_shape())
+        assert(C % group_div == 0)
+        print(N)
+        print(H)
+        print(W)
+        print(C)
+        new_layer = tf.reshape(input_layer, [-1, int(H), int(W), int(C // group_div), int(group_div)])
+        mean, var = tf.nn.moments(new_layer, axes = [1, 2, 3], keep_dims = True)
+        new_layer = (new_layer - mean) / tf.sqrt(var + 1e-5)
+        new_layer = tf.reshape(new_layer, [N, H, W, C])
+        self.add_layer(new_layer)
+        
     def add_conv_act(self, filter_param, output_ch, activatioin_type, bias = True, name = None, input_name = None):
         self.add_conv(filter_param, output_ch, bias, input_name = input_name)
         self.add_activation(activatioin_type, name)
