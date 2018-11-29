@@ -13,7 +13,7 @@ class EdgeAIdetection(Dataset):
     def __init__(self, resized_h = 1216, resized_w = 1936):
         super().__init__()
         s = storage.Storage()
-        self.__data_path = s.dataset_path("edgeAI_detection")
+        self.__data_path = s.dataset_path("edgeai_detection")
         self.__rgb_path_dict = {}
         self.__json_path_dict = {}
         self.__resized_h = resized_h
