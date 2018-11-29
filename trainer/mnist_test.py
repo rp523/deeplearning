@@ -32,13 +32,27 @@ def mnist_trial():
         #network.add_batchnorm()
         network.add_groupnorm(group_div = 16)
         network.add_activation("relu")
-        network.add_quantize(N)
+        layer = network.get_input(None)
+        q_layer = network.make_quantize(N, layer)
+        network.add_switch(layer, q_layer)
     
     network.add_full_connect(1024)
+    layer = network.get_input(None)
+    q_layer = network.make_quantize(N, layer)
+    network.add_switch(layer, q_layer)
+
     network.add_activation("relu")
+    layer = network.get_input(None)
+    q_layer = network.make_quantize(N, layer)
+    network.add_switch(layer, q_layer)
+
     network.add_dropout(0.5)
     
     network.add_full_connect(10)
+    layer = network.get_input(None)
+    q_layer = network.make_quantize(N, layer)
+    network.add_switch(layer, q_layer)
+    
     network.add_softmax("answer")
     network.add_loss("cross_entropy", name = "ce_loss")
     #network.show()
