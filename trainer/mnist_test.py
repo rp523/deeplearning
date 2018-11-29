@@ -12,18 +12,7 @@ from trainer import Trainer
 def mnist_trial():
     
     mnist = MNIST()
-    
     N = 7
-    def quantize(x):
-        sign = tf.sign(x)
-        val = tf.abs(x)
-        y = tf.log(val) / tf.log(2.0) + N
-        y = tf.maximum(y, 0)
-        y = tf.cast(y, tf.int32)
-        y = tf.cast(y, tf.float32)
-        y = sign * (2 ** (y - N))
-        y = tf.reshape(x, x.get_shape())
-        return y
     network = ImageNetwork(image_h = 28,
                            image_w = 28,
                            image_ch = 1,
@@ -36,10 +25,14 @@ def mnist_trial():
         input_ch = network.get_input(None).get_shape().as_list()[3]
         weight = network.make_conv_weight(filter_param, input_ch = input_ch, output_ch = output_ch)
         bias   = network.make_conv_bias(output_ch = output_ch)
-        network.add_conv(filter_param, output_ch, weight = weight, bias = bias)
+        conv = network.make_conv(filter_param, output_ch, weight = weight, bias = bias)
+        q_conv = network.make_quantize(N, conv)
+        network.add_switch(conv, q_conv)
         
+        #network.add_batchnorm()
         network.add_groupnorm(group_div = 16)
         network.add_activation("relu")
+        network.add_quantize(N)
     
     network.add_full_connect(1024)
     network.add_activation("relu")
@@ -69,15 +62,18 @@ def mnist_trial():
             for b in (range(x.shape[0] // batch_size)):
                 batch_cnt += batch_size
                 batch_idx = np.random.choice(np.arange(x.shape[0]), batch_size, replace = True)
-                is_training = True
-                learn_feed_dict = network.create_feed_dict(input_image = x[batch_idx] / 128 - 0.5, is_training = is_training, label_dict = {"ce_loss": y[batch_idx]})
+                learn_feed_dict = network.create_feed_dict(input_image = x[batch_idx] / 128 - 0.5, is_training = True, label_dict = {"ce_loss": y[batch_idx]})
                 sess.run(optimizer, feed_dict = learn_feed_dict)
                 if b % 10 == 0:
-                    is_training = False
-                    eval_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = is_training, label_dict = {"ce_loss": yv})
-                    ans_mat = sess.run(network.get_layer("answer"), feed_dict = eval_feed_dict)
-                    acc = np.average(np.argmax(ans_mat, axis = 1) == np.argmax(yv, axis = 1))
-                    print("[epoch={e}/{et}][batch={b}/{bt}] acc={acc}".format(e = epoch, et = epoch_num, b = batch_cnt, bt = x.shape[0], acc = acc))
+                    eval_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = False, label_dict = {"ce_loss": yv})
+                    eval_ans_mat = sess.run(network.get_layer("answer"), feed_dict = eval_feed_dict)
+                    eval_acc = np.average(np.argmax(eval_ans_mat, axis = 1) == np.argmax(yv, axis = 1))
+                    learn_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = True, label_dict = {"ce_loss": yv})
+                    learn_ans_mat = sess.run(network.get_layer("answer"), feed_dict = learn_feed_dict)
+                    learn_acc = np.average(np.argmax(learn_ans_mat, axis = 1) == np.argmax(yv, axis = 1))
+                    print("[epoch={e}/{et}][batch={b}/{bt}] acc={lacc},{eacc}".format(e = epoch, et = epoch_num, b = batch_cnt, bt = x.shape[0],
+                                                                              lacc = learn_acc,
+                                                                              eacc = eval_acc))
 
 if "__main__" == __name__:
     mnist_trial()

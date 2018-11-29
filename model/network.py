@@ -161,7 +161,7 @@ class ImageNetwork:
         self.__bias_list.append(bias)
         return bias
     
-    def add_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
+    def make_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
         input_layer = self.get_input(input_name)
         assert(input_layer is not None)
         assert(len(input_layer.get_shape()) == 4)
@@ -178,6 +178,10 @@ class ImageNetwork:
                                  padding = self.__get_padding_str(filter_param.padding))
         new_layer = new_layer + bias
         new_layer = tf.identity(new_layer, name = name)
+        return new_layer
+    
+    def add_conv(self, filter_param, output_ch, name = None, input_name = None, dtype = None, weight = None, bias = None):
+        new_layer = self.make_conv(filter_param, output_ch, name, input_name, dtype, weight, bias)
         self.add_layer(new_layer)
 
     def add_pool(self, pool_type, filter_param, name = None, input_name = None):
@@ -246,16 +250,11 @@ class ImageNetwork:
     def add_groupnorm(self, group_div, name = None, input_name = None, dtype = None):
         input_layer = self.get_input(input_name)
         N, H, W, C = input_layer.get_shape()
-        print(input_layer.get_shape())
         assert(C % group_div == 0)
-        print(N)
-        print(H)
-        print(W)
-        print(C)
         new_layer = tf.reshape(input_layer, [-1, int(H), int(W), int(C // group_div), int(group_div)])
         mean, var = tf.nn.moments(new_layer, axes = [1, 2, 3], keep_dims = True)
         new_layer = (new_layer - mean) / tf.sqrt(var + 1e-5)
-        new_layer = tf.reshape(new_layer, [N, H, W, C])
+        new_layer = tf.reshape(new_layer, [-1, H, W, C])
         self.add_layer(new_layer)
         
     def add_conv_act(self, filter_param, output_ch, activatioin_type, bias = True, name = None, input_name = None):
@@ -317,6 +316,31 @@ class ImageNetwork:
         assert(not name in self.__label_dict.keys())
         self.__loss_dict[name]  = loss
         self.__label_dict[name] = label
+
+    def make_quantize(self, N, input_layer):
+        sign = tf.sign(input_layer)
+        val = tf.abs(input_layer)
+        y = tf.log(val) / tf.log(2.0) + N
+        y = tf.maximum(y, 0)
+        y = tf.cast(y, tf.int32)
+        y = tf.cast(y, tf.float32)
+        y = sign * (2 ** (y - N))
+        input_shape = input_layer.get_shape().as_list()
+        new_layer = tf.cond(self.__is_training,
+                            lambda:input_layer,
+                            lambda:tf.reshape(y, [-1] + input_shape[1:]))
+        return new_layer
+
+    def add_quantize(self, N, input_name = None):
+        input_layer = self.get_input(input_name)
+        new_layer = self.make_quantize(N, input_layer)
+        self.add_layer(new_layer)
+    
+    def add_switch(self, true_layer, false_layer):
+        new_layer = tf.cond(self.__is_training,
+                            lambda:true_layer,
+                            lambda:false_layer)
+        self.add_layer(new_layer)
 
     def add_rect_loss(self, name, gamma, alpha,
                       offset_y_list, offset_x_list, size_list, asp_list,
