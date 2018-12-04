@@ -27,10 +27,10 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels_list, rects_list, p
                                   anchor.shape[2],
                                   anchor.shape[3])).astype(np.float)
         tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
+        cls_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3])).astype(np.int)
+        reg_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3], 4)).astype(np.float)
         for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
             anchor_ph_val[j] = anchor
-            cls_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3])).astype(np.int)
-            reg_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3], 4)).astype(np.float)
             if (not rect_labels is None):
                 cls_list[j], reg_list[j] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
         label_dict["cls_label{}".format(i)] = cls_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
@@ -431,7 +431,7 @@ def focal_trial():
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
-                print(sess.run([optimizer, total_loss, loss_weight_vec], feed_dict = learn_feed_dict))
+                print(sess.run([optimizer, total_loss, loss_weight_vec, gamma, alpha], feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
