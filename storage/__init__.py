@@ -13,6 +13,8 @@ class Storage:
             self.__location = "floydhub"
         elif pcname == "Yusuke-PC":
             self.__location = "desktop"
+        elif pcname == "auto3tes123":
+            self.__location = "auto3tes123"
         else:
             with open("uname_err.txt", "w") as f:
                 f.write(pcname)
@@ -27,6 +29,8 @@ class Storage:
             base_path = "/floyd/input"
         elif self.__location == "desktop":
             base_path = r"G:\dataset"
+        elif self.__location == "auto3tes123":
+            base_path = r"/gpfs/auto3tes123/dataset"
         else:
             assert(0)
         dataset_path = os.path.join(base_path, dataset_name)
