@@ -15,23 +15,29 @@ import time
 from PIL import Image, ImageDraw
 from datetime import datetime
 
-def make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th, neg_th):
+def make_feed_dict(network, batch_size, img_arr, rect_labels_list, rects_list, pos_th, neg_th):
     feed_dict = {}
     
     label_dict = {}
     for i in range(2, 5 + 1):
         anchor_ph, anchor = network.get_anchor("reg_label{}".format(i))
-        feed_dict[anchor_ph] = anchor.reshape(batch_size,
-                                              anchor.shape[0],
-                                              anchor.shape[1],
-                                              anchor.shape[2],
-                                              anchor.shape[3])
-        if (not rect_labels is None):
-            cls, reg = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
-            tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
-            label_dict["cls_label{}".format(i)] = cls.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
-            label_dict["reg_label{}".format(i)] = reg.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
-    feed_dict.update(network.create_feed_dict(input_image = img_arr.reshape(-1, img_arr.shape[0], img_arr.shape[1], img_arr.shape[2]),
+        anchor_ph_val = np.empty((batch_size,
+                                  anchor.shape[0],
+                                  anchor.shape[1],
+                                  anchor.shape[2],
+                                  anchor.shape[3])).astype(np.float)
+        tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
+        for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
+            anchor_ph_val[j] = anchor
+            cls_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3])).astype(np.int)
+            reg_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3], 4)).astype(np.float)
+            if (not rect_labels is None):
+                cls_list[j], reg_list[j] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
+        label_dict["cls_label{}".format(i)] = cls_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
+        label_dict["reg_label{}".format(i)] = reg_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
+        feed_dict[anchor_ph] = anchor_ph_val
+    assert(img_arr.shape[0] == batch_size)
+    feed_dict.update(network.create_feed_dict(input_image = img_arr,
                                               label_dict = label_dict,
                                               is_training = True))
     
@@ -192,9 +198,11 @@ def focal_net(img_h,
                                      4])
         network.add_identity(name = "reg{}".format(i + 2))
         # loss
+        gamma = tf.Variable(2.0, dtype = tf.float32)
+        alpha = tf.Variable(0.5, dtype = tf.float32)
         network.add_rect_loss(name = "loss{}".format(i + 2),
-                              gamma = 5.0,
-                              alpha = 0.5,
+                              gamma = gamma,
+                              alpha = alpha,
                               size_list = anchor_size,
                               asp_list = anchor_asp,
                               offset_y_list = anchor_offset_y,
@@ -204,7 +212,7 @@ def focal_net(img_h,
                               cls_label_name = "cls_label{}".format(i + 2),
                               reg_label_name = "reg_label{}".format(i + 2))
     
-    return network
+    return network, gamma, alpha
 
 def evaluate(network, img_h, img_w, 
              anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, 
@@ -268,7 +276,7 @@ def focal_trial():
                       ["person", "rider"]]
     
     #from PIL import Image;Image.fromarray(rgb_arr_).show();exit()
-    network = focal_net(img_h  = img_h,
+    network, gamma, alpha = focal_net(img_h  = img_h,
                         img_w  = img_w,
                         img_ch = img_ch,
                         anchor_size = anchor_size,
@@ -278,7 +286,7 @@ def focal_trial():
                         tgt_words_list = tgt_words_list)
     
     batch_size = 1
-    epoch_num = 5
+    epoch_num = 30
     lr = tf.placeholder(dtype = tf.float32)
     pos_th = 0.5
     neg_th = 0.4
@@ -412,9 +420,15 @@ def focal_trial():
             for b in tqdm(range(data.get_sample_num(train_type) // batch_size)):
                 
                 # one image
-                rect_labels = np.empty(0)
-                img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = None, flip = None)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
+                rect_labels_list = []
+                rects_list = []
+                img_arr_list = np.empty((batch_size, img_h, img_w, img_ch)).astype(np.int)
+                for batch_cnt in range(batch_size):
+                    img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = None, flip = None)
+                    img_arr_list[batch_cnt] = img_arr
+                    rect_labels_list.append(rect_labels)
+                    rects_list.append(rects)
+                learn_feed_dict = make_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
                 print(sess.run([optimizer, total_loss, loss_weight_vec], feed_dict = learn_feed_dict))
