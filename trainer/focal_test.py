@@ -198,11 +198,9 @@ def focal_net(img_h,
                                      4])
         network.add_identity(name = "reg{}".format(i + 2))
         # loss
-        gamma = tf.Variable(2.0, dtype = tf.float32)
-        alpha = tf.Variable(0.5, dtype = tf.float32)
         network.add_rect_loss(name = "loss{}".format(i + 2),
-                              gamma = gamma,
-                              alpha = alpha,
+                              gamma = 2.0,
+                              alpha = 0.5,
                               size_list = anchor_size,
                               asp_list = anchor_asp,
                               offset_y_list = anchor_offset_y,
@@ -212,7 +210,7 @@ def focal_net(img_h,
                               cls_label_name = "cls_label{}".format(i + 2),
                               reg_label_name = "reg_label{}".format(i + 2))
     
-    return network, gamma, alpha
+    return network
 
 def evaluate(network, img_h, img_w, 
              anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, 
@@ -228,7 +226,11 @@ def evaluate(network, img_h, img_w,
                 for val_idx in tqdm(range(val_data.get_sample_num(val_type))):
                     # one image
                     img_arr, rect_labels, rects, _1, _2 = val_data.get_vertices_data(val_type, tgt_words_list, index = val_idx, flip = False)
-                    eval_feed_dict = make_feed_dict(network = network, img_arr = img_arr, rect_labels = rect_labels, rects = rects, pos_th = 0, neg_th = 0, batch_size = 1)
+                    eval_feed_dict = make_feed_dict(network = network,
+                                                    img_arr = np.reshape(img_arr, [1] + list(img_arr.shape)),
+                                                    rect_labels_list = [rect_labels],
+                                                    rects_list = [rects],
+                                                    pos_th = 0, neg_th = 0, batch_size = 1)
                     #one_loss = sess.run(total_loss, feed_dict = eval_feed_dict)
                     
                     # output prediction image
@@ -276,7 +278,7 @@ def focal_trial():
                       ["person", "rider"]]
     
     #from PIL import Image;Image.fromarray(rgb_arr_).show();exit()
-    network, gamma, alpha = focal_net(img_h  = img_h,
+    network = focal_net(img_h  = img_h,
                         img_w  = img_w,
                         img_ch = img_ch,
                         anchor_size = anchor_size,
@@ -285,7 +287,7 @@ def focal_trial():
                         anchor_offset_x = anchor_offset_x,
                         tgt_words_list = tgt_words_list)
     
-    batch_size = 1
+    batch_size = 16
     epoch_num = 30
     lr = tf.placeholder(dtype = tf.float32)
     pos_th = 0.5
@@ -431,7 +433,7 @@ def focal_trial():
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
-                print(sess.run([optimizer, total_loss, loss_weight_vec, gamma, alpha], feed_dict = learn_feed_dict))
+                print(epoch, b, sess.run([optimizer, total_loss, loss_weight_vec], feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
