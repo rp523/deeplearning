@@ -12,6 +12,7 @@ class Dataset:
         # non-zero values
         self.label_dict["road"         ] = len(self.label_dict.keys()) + 1
         self.label_dict["sidewalk"     ] = len(self.label_dict.keys()) + 1
+        self.label_dict["road shoulder"] = len(self.label_dict.keys()) + 1
         self.label_dict["parking"      ] = len(self.label_dict.keys()) + 1
         self.label_dict["rail track"   ] = len(self.label_dict.keys()) + 1
         
@@ -75,7 +76,27 @@ class Dataset:
         self.area_dict = {}
         self.area_dict["driving lane"] = 1
         self.area_dict["beyond line" ] = 2
-    
+        
+        self.palette = np.array([[255,   0,   0],
+                                [0  ,   0, 255],
+                                [193, 214,   0],
+                                [180,   0, 129],
+                                [255, 121, 166],
+                                [208, 149,   1],
+                                [255, 255,   0],
+                                [255, 134,   0],
+                                [  0, 152, 225],
+                                [  0, 203, 151],
+                                [ 85, 255,  50],
+                                [ 92, 136, 125],
+                                [ 69,  47, 142],
+                                [136,  45,  66],
+                                [  0, 255, 255],
+                                [215,   0, 255],
+                                [180, 131, 135],
+                                [ 81,  99,   0],
+                                [ 86,  62,  67]])
+        
     def convert_label_org_val(self, src_labels, words_list = None):
         if words_list is None:
             return src_labels
