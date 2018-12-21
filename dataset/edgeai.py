@@ -9,13 +9,16 @@ import storage
 from common import fileio
 from dataset.__init__ import Dataset
 
-class EdgeAIdetection(Dataset):
+class EdgeAI(Dataset):
     def __init__(self, resized_h = 1216, resized_w = 1936):
         super().__init__()
         s = storage.Storage()
-        self.__data_path = s.dataset_path("edgeai_detection")
+        self.__dtc_path = s.dataset_path(os.path.join("edgeai", "dtc"))
+        self.__seg_path = s.dataset_path(os.path.join("edgeai", "seg"))
         self.__rgb_path_dict = {}
         self.__json_path_dict = {}
+        self.__seg_rgb_path_dict = {}
+        self.__seg_lbl_path_dict = {}
         self.__resized_h = resized_h
         self.__resized_w = resized_w
         self.__org_w = 1936
@@ -33,8 +36,35 @@ class EdgeAIdetection(Dataset):
             "SVehicle":"special",
             "Motorbike":"motorcycle",
             "Train":"train",
-       }
-    
+        }
+        for v in self.conv_dict.values():
+            assert(v in self.label_dict.keys())
+        
+        self.seg_palette = \
+        {
+            "car"           : [0  ,   0, 255],
+            "bus"           : [193, 214,   0],
+            "truck"         : [180,   0, 129],
+            "special"       : [255, 121, 166],
+            "person"        : [255,   0,   0],
+            "motorcycle"    : [208, 149,   1],
+            "traffic light" : [255, 255,   0],
+            "traffic sign"  : [255, 134,   0],
+            "sky"           : [  0, 152, 225],
+            "building"      : [  0, 203, 151],
+            "vegetation"    : [ 85, 255,  50],
+            "wall"          : [ 92, 136, 125],
+            "lane"          : [ 69,  47, 142],
+            "ground"        : [136,  45,  66],
+            "sidewalk"      : [  0, 255, 255],
+            "road shoulder" : [215,   0, 255],
+            "static"        : [180, 131, 135],
+            "out of eval"   : [ 81,  99,   0],
+            "ego vehicle"   : [ 86,  62,  67],
+        }
+        for k in self.seg_palette.keys():
+            assert(k in self.label_dict.keys())
+        
     def __update_list(self, data_type):
         assert((data_type == "train") or \
                (data_type == "test"  ) or \
@@ -47,7 +77,7 @@ class EdgeAIdetection(Dataset):
         
         # RGB image
         if not data_type in self.__rgb_path_dict.keys():
-            rgb_dir_path = os.path.join(self.__data_path, "dtc_{}_images".format(data_type))
+            rgb_dir_path = os.path.join(self.__dtc_path, "dtc_{}_images".format(data_type))
             assert(os.path.exists(rgb_dir_path))
             assert(os.path.isdir(rgb_dir_path))
             rgb_path_list = fileio.get_file_list(tgt_dir = rgb_dir_path,
@@ -58,7 +88,7 @@ class EdgeAIdetection(Dataset):
         
         # JSON
         if not data_type in self.__json_path_dict.keys():
-            json_dir_path = os.path.join(self.__data_path, "dtc_{}_annotations".format(data_type))
+            json_dir_path = os.path.join(self.__dtc_path, "dtc_{}_annotations".format(data_type))
             if os.path.exists(json_dir_path):
                 assert(os.path.isdir(json_dir_path))
                 json_path_list = fileio.get_file_list(tgt_dir = json_dir_path,
@@ -79,9 +109,59 @@ class EdgeAIdetection(Dataset):
 
         return data_type
     
+    def __update_seg_list(self, data_type):
+        assert((data_type == "train") or \
+               (data_type == "test"  ) or \
+               (data_type == "debug" ))
+        
+        max_num = None
+        if data_type == "debug":
+            max_num = 100
+            data_type = "test"
+        
+        # RGB image
+        if not data_type in self.__seg_rgb_path_dict.keys():
+            seg_rgb_dir_path = os.path.join(self.__seg_path, "seg_{}_images".format(data_type))
+            print(seg_rgb_dir_path)
+            assert(os.path.exists(seg_rgb_dir_path))
+            assert(os.path.isdir(seg_rgb_dir_path))
+            seg_rgb_path_list = fileio.get_file_list(tgt_dir = seg_rgb_dir_path,
+                                                     tgt_ext = ".jpg",
+                                                     max_num = max_num)
+            seg_rgb_path_list.sort()
+            self.__seg_rgb_path_dict[data_type] = seg_rgb_path_list
+        
+        # annotation
+        if not data_type in self.__seg_lbl_path_dict.keys():
+            seg_lbl_dir_path = os.path.join(self.__seg_path, "seg_{}_annotations".format(data_type))
+            if os.path.exists(seg_lbl_dir_path):
+                assert(os.path.exists(seg_lbl_dir_path))
+                assert(os.path.isdir(seg_lbl_dir_path))
+                seg_lbl_path_list = fileio.get_file_list(tgt_dir = seg_lbl_dir_path,
+                                                         tgt_ext = ".png",
+                                                         max_num = max_num)
+                seg_lbl_path_list.sort()
+                self.__seg_lbl_path_dict[data_type] = seg_lbl_path_list
+                
+                # matching check
+                assert(len(self.__seg_rgb_path_dict[data_type]) == len(self.__seg_lbl_path_dict[data_type]))
+                for i, lbl_path in enumerate(self.__seg_lbl_path_dict[data_type]):
+                    lbl_name = fileio.get_file_name(lbl_path)
+                    lbl_key = lbl_name[:-len(".png")]
+                    rgb_path = self.__seg_rgb_path_dict[data_type][i]
+                    rgb_name = fileio.get_file_name(rgb_path)
+                    rgb_key = rgb_name[:-len(".jpg")]
+                    assert(rgb_key == lbl_key)
+
+        return data_type
+    
     def get_sample_num(self, data_type):
         data_type = self.__update_list(data_type)
         return len(self.__rgb_path_dict[data_type])
+    
+    def get_seg_sample_num(self, data_type):
+        data_type = self.__update_seg_list(data_type)
+        return len(self.__seg_rgb_path_dict[data_type])
     
     def get_vertices_data(self, data_type, tgt_words_list = None, index = None, flip = None):
         data_type = self.__update_list(data_type)
@@ -151,6 +231,34 @@ class EdgeAIdetection(Dataset):
         
         return rgb_arr, rect_labels, rects, poly_labels, polygons
     
+    def get_seg_data(self, data_type, tgt_words_list, index = None, flip = None):
+        self.__update_seg_list(data_type)
+        if index is None:
+            index = np.random.randint(len(self.__seg_rgb_path_dict[data_type]))
+        lbl_path = self.__seg_lbl_path_dict[data_type][index]
+        org_lbl_arr = np.asarray(Image.open(lbl_path))
+        assert(org_lbl_arr.ndim == 3)
+        
+        # 当面はデバッグ残す
+        if 0:
+            for y in range(org_lbl_arr.shape[0]):
+                for x in range(org_lbl_arr.shape[1]):
+                    if not (list(org_lbl_arr[y, x]) in self.seg_palette.values()):
+                        print(list(org_lbl_arr[y, x])) 
+                    assert(list(org_lbl_arr[y, x]) in self.seg_palette.values())
+
+        lbl_arr = np.zeros(list(org_lbl_arr.shape)[:-1]).astype(np.int)
+        for i, tgt_words in enumerate(tgt_words_list):
+            for tgt_word in tgt_words:
+                assert(tgt_word in self.label_dict.keys())
+                if tgt_word in self.seg_palette.keys():
+                    col = self.seg_palette[tgt_word]
+                    fill = np.all(org_lbl_arr == col, axis = 2)
+                    lbl_arr[fill] = i + 1
+        rgb_path = self.__seg_rgb_path_dict[data_type][index]
+        rgb_arr = np.asarray(Image.open(rgb_path))
+        return rgb_arr, lbl_arr
+    
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
         red   = (255,   0,   0, 128)
         blue  = (  0,   0, 255,  64)
@@ -197,6 +305,18 @@ class EdgeAIdetection(Dataset):
         #rgb_img.show()
         return rgb_img
         
+    def summary_seg_data(self, rgb_arr, lbl_arr):
+        alpha = 0.5
+        sum_arr = rgb_arr.copy()
+        for val in np.unique(lbl_arr).astype(np.int):
+            fill_idx = (val == lbl_arr)
+            if val != 0:
+                ave_col = alpha * sum_arr[fill_idx] + (1.0 - alpha) * self.palette[val - 1]
+            else:
+                ave_col = alpha * sum_arr[fill_idx]
+            sum_arr[fill_idx] = ave_col.astype(np.uint8)
+        return Image.fromarray(sum_arr)
+
     def list_new_category(self):
         data_type = "train"
         json_cat = []
@@ -207,9 +327,9 @@ class EdgeAIdetection(Dataset):
             for obj in info["labels"]:
                 if not obj["category"] in json_cat:
                     json_cat.append(obj["category"])
-        for bdd in json_cat:
-            if not bdd in self.label_dict.keys():
-                print(bdd)
+        for label in json_cat:
+            if not label in self.label_dict.keys():
+                print(label)
  
     def split_json(self):
         for data_type in ["val", "train"]:
@@ -240,24 +360,23 @@ class EdgeAIdetection(Dataset):
                                 out = out + line
                         line = fin.readline()
                         
-def make_seg_summary_img(data_type):
-    b = BDD100k()
+def make_seg_summary_img(data_type, tgt_words_list):
+    e = EdgeAI()
     from tqdm import tqdm
-    dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "seg_test")
+    dst_dir_path = os.path.join(storage.Storage().dataset_path(os.path.join("edgeai", "seg")), "seg_test")
 
     dst_dir = os.path.join(dst_dir_path, data_type)
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
-    print(dst_dir)
-    for i in tqdm(range(b.get_seg_sample_num(data_type))):
-        rgb_arr, seg_arr = b.get_seg_data(data_type, i)
-        b.summary_seg_data(rgb_arr, seg_arr).save( \
+    for i in tqdm(range(e.get_seg_sample_num(data_type))):
+        rgb_arr, seg_arr = e.get_seg_data(data_type, tgt_words_list = tgt_words_list, index = i)
+        e.summary_seg_data(rgb_arr, seg_arr).save( \
             os.path.join(dst_dir, "{0:06d}.png".format(i)))
 
 def make_vertices_summary_img(data_type, tgt_labels):
-    e = EdgeAIdetection()
+    e = EdgeAI()
     from tqdm import tqdm
-    dst_dir_path = os.path.join(storage.Storage().dataset_path("edgeAI_detection"), "vertices_test")
+    dst_dir_path = os.path.join(storage.Storage().dataset_path(os.path.join("edgeai", "dtc")), "vertices_test")
     
     dst_dir = os.path.join(dst_dir_path, data_type)
     print("writing " + dst_dir)
@@ -289,6 +408,7 @@ def main():
     tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
     make_vertices_summary_img("train", tgt_words_list)
+    #make_seg_summary_img("train", tgt_words_list)
 if __name__ == "__main__":
     main()
     print("Done.")
