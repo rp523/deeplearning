@@ -55,7 +55,6 @@ def get_file_list(tgt_dir,
                                           tgt_ext = tgt_ext,
                                           only_name = only_name,
                                           max_num = max_num,
-                                          recursive_base = ret,
                                           recursive = recursive)
     if not max_num is None:
         if len(ret) > max_num:
