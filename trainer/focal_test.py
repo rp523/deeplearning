@@ -6,7 +6,7 @@ import tensorflow as tf
 sys.path.append("../")
 
 from dataset.bdd100k import BDD100k
-from dataset.edgeAI_detection import EdgeAIdetection
+from dataset.edgeai import EdgeAI
 
 from model.network import ImageNetwork
 from transformer import *
@@ -55,7 +55,7 @@ def calc_class_freq(network, data, dat_type, tgt_words_list, reg_label_name_list
                 cnt[c] = cnt[c] + np.sum(cls == c)
     return cnt / np.sum(cnt)
 
-def get_total_loss(network, weight_decay):
+def get_dtc_loss(network, weight_decay):
     loss = tf.constant(0.0, dtype = tf.float32)
 
     cls_loss = tf.constant(0.0, dtype = tf.float32)
@@ -66,9 +66,6 @@ def get_total_loss(network, weight_decay):
             cls_loss = cls_loss + v
         elif k.find("reg") >= 0:
             reg_loss = reg_loss + v
-        else:
-            print(k)
-            assert(0)
     cls_s = tf.Variable(0.0, dtype = tf.float32)
     reg_s = tf.Variable(0.0, dtype = tf.float32)
     loss = loss + (1.0 * tf.exp(- cls_s) * cls_loss + 0.5 * cls_s)
@@ -78,6 +75,20 @@ def get_total_loss(network, weight_decay):
         loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
     return loss, [tf.exp(-cls_s), cls_loss, 0.5 * tf.exp(-reg_s), reg_loss]
 
+def get_segmentation_loss(network, weight_decay):
+    loss = tf.constant(0.0, dtype = tf.float32)
+
+    seg_loss = tf.constant(0.0, dtype = tf.float32)
+    for k, v in network.get_loss_dict().items():
+        # weighting rule below is cited from: https://arxiv.org/abs/1705.07115
+        if k.find("seg") == 0:
+            seg_loss = seg_loss + v
+    seg_s = tf.Variable(0.0, dtype = tf.float32)
+    loss = loss + (1.0 * tf.exp(- seg_s) * seg_loss + 0.5 * seg_s)
+    
+    for weight in network.get_weight_list():
+        loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
+    return loss
 
 def focal_net(img_h,
               img_w,
@@ -173,6 +184,7 @@ def focal_net(img_h,
                                        input_ch = 256, output_ch = reg_ch)
     reg_bias = network.make_conv_bias(output_ch = reg_ch)
 
+    # detection
     for i in range(4):
         feature_layer_name = "c{}".format(i + 2)
         # classificatin
@@ -197,7 +209,19 @@ def focal_net(img_h,
                                      reg_ch // 4,
                                      4])
         network.add_identity(name = "reg{}".format(i + 2))
-        # loss
+    '''
+    # segmentation
+    concat_name_list = []
+    for i in range(4):
+        network.add_upsample(2 ** i, 2 ** i,
+                             input_name = "c{}".format(i + 2),
+                             name = "seg_ch{}".format(i + 2))
+        concat_name_list.append("seg_ch{}".format(i + 2))
+    network.add_concat(concat_name_list = concat_name_list)
+    network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, name = "seg")
+    '''
+    # detection-loss
+    for i in range(4):
         network.add_rect_loss(name = "loss{}".format(i + 2),
                               gamma = 2.0,
                               alpha = 0.5,
@@ -209,7 +233,12 @@ def focal_net(img_h,
                               reg_layer_name = "reg{}".format(i + 2),
                               cls_label_name = "cls_label{}".format(i + 2),
                               reg_label_name = "reg_label{}".format(i + 2))
-    
+    ''' 
+    # segmentation-loss
+    network.add_loss(loss_type = "cross_entropy",
+                     name = "seg",
+                     gamma = 2.0)
+    '''
     return network
 
 def evaluate(network, img_h, img_w, 
@@ -294,24 +323,25 @@ def focal_trial():
     neg_th = 0.4
     
 #    data = BDD100k(resized_h = img_h,
-    data = EdgeAIdetection(resized_h = img_h,
+    data = EdgeAI(resized_h = img_h,
                   resized_w = img_w)
-    total_loss, loss_weight_vec = get_total_loss(network, weight_decay = 1E-4)
-    optimizer = tf.train.AdamOptimizer(learning_rate = lr).minimize(total_loss)
+    dtc_loss, dtc_loss_weight_vec = get_dtc_loss(network, weight_decay = 1E-4)
+    dtc_opt = tf.train.AdamOptimizer(learning_rate = lr).minimize(dtc_loss)
     
     train_type = "train"
     val_type = "val"
     test_type = "test"
     log_interval_sec = 60 * 30
     restore_path = None#r""
-    if 0:
+    if 1:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
            (pcname == "Yusuke-PC"):
             train_type = "debug"
             val_type = "debug"
-    
+            batch_size = 2
+            
     if 0:   # ポジティブ判定が出たアンカーを描画
         pal = []
         pal.append((255,0,0))
@@ -433,7 +463,7 @@ def focal_trial():
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
-                print(epoch, b, sess.run([optimizer, total_loss, loss_weight_vec], feed_dict = learn_feed_dict))
+                print(epoch, b, sess.run([dtc_opt, dtc_loss, dtc_loss_weight_vec], feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
