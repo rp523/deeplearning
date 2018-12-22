@@ -33,10 +33,11 @@ def make_feed_dict(network, batch_size,
         tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
         cls_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3])).astype(np.int)
         reg_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3], 4)).astype(np.float)
-        for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
-            anchor_ph_val[j] = anchor
-            if (not rect_labels is None):
-                cls_list[j], reg_list[j] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
+        if (rect_labels_list.size > 0) and (rects_list.size > 0):
+            for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
+                anchor_ph_val[j] = anchor
+                if (not rect_labels is None):
+                    cls_list[j], reg_list[j] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
         label_dict["cls_label{}".format(i)] = cls_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
         label_dict["reg_label{}".format(i)] = reg_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
         feed_dict[anchor_ph] = anchor_ph_val
@@ -337,7 +338,7 @@ def focal_trial():
     test_type = "test"
     log_interval_sec = 60 * 30
     restore_path = None#r""
-    if 1:
+    if 0:
         # 軽量化
         pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
@@ -399,27 +400,34 @@ def focal_trial():
                     img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
-                    learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
-                    # visualize anchored label
-                    for l in range(2, 5 + 1):
-                        cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(tf.one_hot(network._ImageNetwork__label_dict["cls_label{}".format(l)], depth = cls_num), feed_dict = learn_feed_dict),
-                                                                    anchor_reg_t = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict),
-                                                                    size_list = anchor_size,
-                                                                    asp_list = anchor_asp,
-                                                                    offset_y_list = anchor_offset_y,
-                                                                    offset_x_list = anchor_offset_x,
-                                                                    thresh = 0.5)
-                        for j in range(cls.size):
-                            if cls[j] != 0:
-                                draw.rectangle((rect[j][1] * img_w,
-                                                rect[j][0] * img_h,
-                                                rect[j][3] * img_w,
-                                                rect[j][2] * img_h),
-                                                outline = pal[cls[j] - 1])
-                                draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
-                                          text = "{:.2f}".format(score[j]),
-                                          fill = pal[cls[j] - 1])
-                    pil_img.save(os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png"))
+                    if (rect_labels.size > 0) and (rects.size > 0):
+                        learn_feed_dict = make_feed_dict(network,
+                                                         1, #batch_size,
+                                                         np.reshape(img_arr,     [1] + list(img_arr.shape)),
+                                                         np.reshape(rect_labels, [1] + list(rect_labels.shape)),
+                                                         np.reshape(rects,       [1] + list(rects.shape)),
+                                                         pos_th = pos_th, neg_th = neg_th)
+                        # visualize anchored label
+                        for l in range(2, 5 + 1):
+                            cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(tf.one_hot(network._ImageNetwork__label_dict["cls_label{}".format(l)], depth = cls_num), feed_dict = learn_feed_dict),
+                                                                        anchor_reg_t = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict),
+                                                                        size_list = anchor_size,
+                                                                        asp_list = anchor_asp,
+                                                                        offset_y_list = anchor_offset_y,
+                                                                        offset_x_list = anchor_offset_x,
+                                                                        thresh = 0.5)
+                            for j in range(cls.size):
+                                if cls[j] != 0:
+                                    draw.rectangle((rect[j][1] * img_w,
+                                                    rect[j][0] * img_h,
+                                                    rect[j][3] * img_w,
+                                                    rect[j][2] * img_h),
+                                                    outline = pal[cls[j] - 1])
+                                    draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                              text = "{:.2f}".format(score[j]),
+                                              fill = pal[cls[j] - 1])
+                    dst_path = os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png")
+                    pil_img.save(dst_path)
         exit()
     
     if 0:	# evaluate-only
