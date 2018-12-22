@@ -229,6 +229,9 @@ class EdgeAI(Dataset):
             self.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).show()
             exit()
         
+        assert(rgb_arr.ndim == 3)
+        assert(rect_labels.ndim == 1)
+        assert(rects.ndim == 2)
         return rgb_arr, rect_labels, rects, poly_labels, polygons
     
     def get_seg_data(self, data_type, tgt_words_list, index = None, flip = None):
