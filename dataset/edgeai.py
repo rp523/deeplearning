@@ -170,19 +170,14 @@ class EdgeAI(Dataset):
         if index is None:
             flip = np.random.randint(2).astype(np.bool)
         
-        rect_labels = None
-        rects = None
-        poly_labels = None
-        polygons = None
+        rect_labels = np.empty(0).astype(np.int)
+        rects = np.empty((0, 4)).astype(np.float)
+        poly_labels = np.empty(0).astype(np.int)
+        polygons = []
         if data_type in self.__json_path_dict.keys():
             json_path = self.__json_path_dict[data_type][index]
             info = json.load(open(json_path))
             obj_list = info["labels"]
-            
-            rect_labels = np.empty(0).astype(np.int)
-            rects = np.empty((0, 4)).astype(np.float)
-            poly_labels = np.empty(0).astype(np.int)
-            polygons = []
             
             for obj in obj_list:
                 label_name   = self.conv_dict[obj["category"]]
@@ -222,13 +217,20 @@ class EdgeAI(Dataset):
         
         if flip is True:
             rgb_arr = rgb_arr[:,::-1,:]
-            rects[:,[1, 3]] = 1.0 - rects[:,[3, 1]]
-            for i in range(len(polygons)):
-                polygons[i][:,1] = 1.0 - polygons[i][:,1]
+            if rects.size > 0:
+                rects[:,[1, 3]] = 1.0 - rects[:,[3, 1]]
+            if len(polygons) > 0:
+                for i in range(len(polygons)):
+                    polygons[i][:,1] = 1.0 - polygons[i][:,1]
         if 0: #debug view
             self.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).show()
             exit()
         
+        assert(rgb_arr.ndim == 3)
+        if rect_labels.size > 0:
+            assert(rect_labels.ndim == 1)
+        if rects.size > 0:
+            assert(rects.ndim == 2)
         return rgb_arr, rect_labels, rects, poly_labels, polygons
     
     def get_seg_data(self, data_type, tgt_words_list, index = None, flip = None):

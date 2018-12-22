@@ -6,7 +6,7 @@ import tensorflow as tf
 sys.path.append("../")
 
 from dataset.bdd100k import BDD100k
-from dataset.edgeAI_detection import EdgeAIdetection
+from dataset.edgeai import EdgeAI
 
 from model.network import ImageNetwork
 from transformer import *
@@ -15,7 +15,11 @@ import time
 from PIL import Image, ImageDraw
 from datetime import datetime
 
-def make_feed_dict(network, batch_size, img_arr, rect_labels_list, rects_list, pos_th, neg_th):
+def make_feed_dict(network, batch_size,
+                   img_arr,             # batch x h x w x ch
+                   rect_labels_list,    # batch x label
+                   rects_list,          # batch x label x 4
+                   pos_th, neg_th):
     feed_dict = {}
     
     label_dict = {}
@@ -29,10 +33,11 @@ def make_feed_dict(network, batch_size, img_arr, rect_labels_list, rects_list, p
         tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
         cls_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3])).astype(np.int)
         reg_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3], 4)).astype(np.float)
-        for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
-            anchor_ph_val[j] = anchor
-            if (not rect_labels is None):
-                cls_list[j], reg_list[j] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
+        if (len(rect_labels_list) > 0) and (len(rects_list) > 0):
+            for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
+                anchor_ph_val[j] = anchor
+                if (not rect_labels is None):
+                    cls_list[j], reg_list[j] = encode_anchor_label(rect_labels, rects, anchor.reshape(-1, 4), pos_th, neg_th)
         label_dict["cls_label{}".format(i)] = cls_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1)
         label_dict["reg_label{}".format(i)] = reg_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
         feed_dict[anchor_ph] = anchor_ph_val
@@ -55,7 +60,7 @@ def calc_class_freq(network, data, dat_type, tgt_words_list, reg_label_name_list
                 cnt[c] = cnt[c] + np.sum(cls == c)
     return cnt / np.sum(cnt)
 
-def get_total_loss(network, weight_decay):
+def get_dtc_loss(network, weight_decay):
     loss = tf.constant(0.0, dtype = tf.float32)
 
     cls_loss = tf.constant(0.0, dtype = tf.float32)
@@ -66,9 +71,6 @@ def get_total_loss(network, weight_decay):
             cls_loss = cls_loss + v
         elif k.find("reg") >= 0:
             reg_loss = reg_loss + v
-        else:
-            print(k)
-            assert(0)
     cls_s = tf.Variable(0.0, dtype = tf.float32)
     reg_s = tf.Variable(0.0, dtype = tf.float32)
     loss = loss + (1.0 * tf.exp(- cls_s) * cls_loss + 0.5 * cls_s)
@@ -78,6 +80,20 @@ def get_total_loss(network, weight_decay):
         loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
     return loss, [tf.exp(-cls_s), cls_loss, 0.5 * tf.exp(-reg_s), reg_loss]
 
+def get_segmentation_loss(network, weight_decay):
+    loss = tf.constant(0.0, dtype = tf.float32)
+
+    seg_loss = tf.constant(0.0, dtype = tf.float32)
+    for k, v in network.get_loss_dict().items():
+        # weighting rule below is cited from: https://arxiv.org/abs/1705.07115
+        if k.find("seg") == 0:
+            seg_loss = seg_loss + v
+    seg_s = tf.Variable(0.0, dtype = tf.float32)
+    loss = loss + (1.0 * tf.exp(- seg_s) * seg_loss + 0.5 * seg_s)
+    
+    for weight in network.get_weight_list():
+        loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
+    return loss
 
 def focal_net(img_h,
               img_w,
@@ -173,6 +189,7 @@ def focal_net(img_h,
                                        input_ch = 256, output_ch = reg_ch)
     reg_bias = network.make_conv_bias(output_ch = reg_ch)
 
+    # detection
     for i in range(4):
         feature_layer_name = "c{}".format(i + 2)
         # classificatin
@@ -197,7 +214,19 @@ def focal_net(img_h,
                                      reg_ch // 4,
                                      4])
         network.add_identity(name = "reg{}".format(i + 2))
-        # loss
+    '''
+    # segmentation
+    concat_name_list = []
+    for i in range(4):
+        network.add_upsample(2 ** i, 2 ** i,
+                             input_name = "c{}".format(i + 2),
+                             name = "seg_ch{}".format(i + 2))
+        concat_name_list.append("seg_ch{}".format(i + 2))
+    network.add_concat(concat_name_list = concat_name_list)
+    network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, name = "seg")
+    '''
+    # detection-loss
+    for i in range(4):
         network.add_rect_loss(name = "loss{}".format(i + 2),
                               gamma = 2.0,
                               alpha = 0.5,
@@ -209,7 +238,12 @@ def focal_net(img_h,
                               reg_layer_name = "reg{}".format(i + 2),
                               cls_label_name = "cls_label{}".format(i + 2),
                               reg_label_name = "reg_label{}".format(i + 2))
-    
+    ''' 
+    # segmentation-loss
+    network.add_loss(loss_type = "cross_entropy",
+                     name = "seg",
+                     gamma = 2.0)
+    '''
     return network
 
 def evaluate(network, img_h, img_w, 
@@ -294,24 +328,27 @@ def focal_trial():
     neg_th = 0.4
     
 #    data = BDD100k(resized_h = img_h,
-    data = EdgeAIdetection(resized_h = img_h,
+    data = EdgeAI(resized_h = img_h,
                   resized_w = img_w)
-    total_loss, loss_weight_vec = get_total_loss(network, weight_decay = 1E-4)
-    optimizer = tf.train.AdamOptimizer(learning_rate = lr).minimize(total_loss)
+    dtc_loss, dtc_loss_weight_vec = get_dtc_loss(network, weight_decay = 1E-4)
+    dtc_opt = tf.train.AdamOptimizer(learning_rate = lr).minimize(dtc_loss)
     
     train_type = "train"
     val_type = "val"
     test_type = "test"
     log_interval_sec = 60 * 30
     restore_path = None#r""
+
+    # 軽量化
+    pcname = subprocess.getoutput("uname -n")
     if 0:
-        # 軽量化
-        pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
            (pcname == "Yusuke-PC"):
             train_type = "debug"
             val_type = "debug"
-    
+    if (pcname == "isgsktyktt-VJS111"):
+        batch_size = 2
+            
     if 0:   # ポジティブ判定が出たアンカーを描画
         pal = []
         pal.append((255,0,0))
@@ -325,7 +362,12 @@ def focal_trial():
                     img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
-                    learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
+                    learn_feed_dict = make_feed_dict(network,
+                                                     1, #batch_size,
+                                                     np.reshape(img_arr,     [1] + list(img_arr.shape)),
+                                                     np.reshape(rect_labels, [1] + list(rect_labels.shape)),
+                                                     np.reshape(rects,       [1] + list(rects.shape)),
+                                                     pos_th = pos_th, neg_th = neg_th)
                     # visualize anchored label
                     for l in range(2, 5 + 1):
                         cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
@@ -360,27 +402,34 @@ def focal_trial():
                     img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
-                    learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
-                    # visualize anchored label
-                    for l in range(2, 5 + 1):
-                        cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(tf.one_hot(network._ImageNetwork__label_dict["cls_label{}".format(l)], depth = cls_num), feed_dict = learn_feed_dict),
-                                                                    anchor_reg_t = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict),
-                                                                    size_list = anchor_size,
-                                                                    asp_list = anchor_asp,
-                                                                    offset_y_list = anchor_offset_y,
-                                                                    offset_x_list = anchor_offset_x,
-                                                                    thresh = 0.5)
-                        for j in range(cls.size):
-                            if cls[j] != 0:
-                                draw.rectangle((rect[j][1] * img_w,
-                                                rect[j][0] * img_h,
-                                                rect[j][3] * img_w,
-                                                rect[j][2] * img_h),
-                                                outline = pal[cls[j] - 1])
-                                draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
-                                          text = "{:.2f}".format(score[j]),
-                                          fill = pal[cls[j] - 1])
-                    pil_img.save(os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png"))
+                    if (rect_labels.size > 0) and (rects.size > 0):
+                        learn_feed_dict = make_feed_dict(network,
+                                                         1, #batch_size,
+                                                         np.reshape(img_arr,     [1] + list(img_arr.shape)),
+                                                         np.reshape(rect_labels, [1] + list(rect_labels.shape)),
+                                                         np.reshape(rects,       [1] + list(rects.shape)),
+                                                         pos_th = pos_th, neg_th = neg_th)
+                        # visualize anchored label
+                        for l in range(2, 5 + 1):
+                            cls, score, rect = decode_anchor_prediction(anchor_cls = sess.run(tf.one_hot(network._ImageNetwork__label_dict["cls_label{}".format(l)], depth = cls_num), feed_dict = learn_feed_dict),
+                                                                        anchor_reg_t = sess.run(network._ImageNetwork__label_dict["reg_label{}".format(l)], feed_dict = learn_feed_dict),
+                                                                        size_list = anchor_size,
+                                                                        asp_list = anchor_asp,
+                                                                        offset_y_list = anchor_offset_y,
+                                                                        offset_x_list = anchor_offset_x,
+                                                                        thresh = 0.5)
+                            for j in range(cls.size):
+                                if cls[j] != 0:
+                                    draw.rectangle((rect[j][1] * img_w,
+                                                    rect[j][0] * img_h,
+                                                    rect[j][3] * img_w,
+                                                    rect[j][2] * img_h),
+                                                    outline = pal[cls[j] - 1])
+                                    draw.text((rect[j][1] * img_w, rect[j][0] * img_h),
+                                              text = "{:.2f}".format(score[j]),
+                                              fill = pal[cls[j] - 1])
+                    dst_path = os.path.join(dst_dir, "{0:05d}".format(i) + "{}".format(flip) + ".png")
+                    pil_img.save(dst_path)
         exit()
     
     if 0:	# evaluate-only
@@ -433,7 +482,7 @@ def focal_trial():
                 learn_feed_dict = make_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th)
                 learn_feed_dict[lr] = 1e-2
                 
-                print(epoch, b, sess.run([optimizer, total_loss, loss_weight_vec], feed_dict = learn_feed_dict))
+                print(epoch, b, sess.run([dtc_opt, dtc_loss, dtc_loss_weight_vec], feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
