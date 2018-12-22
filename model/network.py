@@ -295,6 +295,17 @@ class ImageNetwork:
         new_layer = tf.identity(input = input_layer, name = name)
         self.add_layer(new_layer)
 
+    def add_concat(self, concat_name_list, name = None):
+        concat_layer_list = []
+        for concat_name in concat_name_list:
+            concat_layer = self.get_input(concat_name)
+            assert(None != concat_layer)
+            concat_layer_list.append(concat_layer)
+        new_layer = tf.concat(concat_layer_list,
+                              axis = 3,
+                              name = name)
+        self.add_layer(new_layer)
+
     def get_loss_dict(self):
         return self.__loss_dict
     
