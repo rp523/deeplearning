@@ -33,7 +33,7 @@ def make_feed_dict(network, batch_size,
         tgt_layer_shape = (network.get_layer("cls{}".format(i)).get_shape().as_list())
         cls_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3])).astype(np.int)
         reg_list = np.empty((batch_size, tgt_layer_shape[1] * tgt_layer_shape[2] * tgt_layer_shape[3], 4)).astype(np.float)
-        if (rect_labels_list.size > 0) and (rects_list.size > 0):
+        if (len(rect_labels_list) > 0) and (len(rects_list) > 0):
             for j, (rect_labels, rects) in enumerate(zip(rect_labels_list, rects_list)):
                 anchor_ph_val[j] = anchor
                 if (not rect_labels is None):
@@ -338,14 +338,16 @@ def focal_trial():
     test_type = "test"
     log_interval_sec = 60 * 30
     restore_path = None#r""
+
+    # 軽量化
+    pcname = subprocess.getoutput("uname -n")
     if 0:
-        # 軽量化
-        pcname = subprocess.getoutput("uname -n")
         if (pcname == "isgsktyktt-VJS111") or \
            (pcname == "Yusuke-PC"):
             train_type = "debug"
             val_type = "debug"
-            batch_size = 2
+    if (pcname == "isgsktyktt-VJS111"):
+        batch_size = 2
             
     if 0:   # ポジティブ判定が出たアンカーを描画
         pal = []
