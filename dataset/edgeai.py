@@ -122,7 +122,6 @@ class EdgeAI(Dataset):
         # RGB image
         if not data_type in self.__seg_rgb_path_dict.keys():
             seg_rgb_dir_path = os.path.join(self.__seg_path, "seg_{}_images".format(data_type))
-            print(seg_rgb_dir_path)
             assert(os.path.exists(seg_rgb_dir_path))
             assert(os.path.isdir(seg_rgb_dir_path))
             seg_rgb_path_list = fileio.get_file_list(tgt_dir = seg_rgb_dir_path,
@@ -258,7 +257,8 @@ class EdgeAI(Dataset):
                     fill = np.all(org_lbl_arr == col, axis = 2)
                     lbl_arr[fill] = i + 1
         rgb_path = self.__seg_rgb_path_dict[data_type][index]
-        rgb_arr = np.asarray(Image.open(rgb_path))
+        rgb_pil = Image.open(rgb_path).resize((self.__resized_w, self.__resized_h))
+        rgb_arr = np.asarray(rgb_pil)
         return rgb_arr, lbl_arr
     
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
