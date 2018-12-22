@@ -14,8 +14,9 @@ from trainer import Trainer
 import time
 from PIL import Image, ImageDraw
 from datetime import datetime
+import common.calc as calc
 
-def make_feed_dict(network, batch_size,
+def make_dtc_feed_dict(network, batch_size,
                    img_arr,             # batch x h x w x ch
                    rect_labels_list,    # batch x label
                    rects_list,          # batch x label x 4
@@ -42,6 +43,28 @@ def make_feed_dict(network, batch_size,
         label_dict["reg_label{}".format(i)] = reg_list.reshape(batch_size, tgt_layer_shape[1], tgt_layer_shape[2], -1, 4)
         feed_dict[anchor_ph] = anchor_ph_val
     assert(img_arr.shape[0] == batch_size)
+    feed_dict.update(network.create_feed_dict(input_image = img_arr,
+                                              label_dict = label_dict,
+                                              is_training = True))
+    
+    return feed_dict
+
+def make_seg_feed_dict(network, batch_size,
+                       img_arr,             # batch x h x w x ch
+                       seg_arr):           # batch x h x w
+    feed_dict = {}
+    
+    label_dict = {}
+    seg_layer_shape = network.get_layer("seg").get_shape().as_list()
+    seg_h = seg_layer_shape[1]
+    seg_w = seg_layer_shape[2]
+    cls_num = seg_layer_shape[3]
+    label = np.zeros((batch_size, seg_h, seg_w, cls_num)).astype(np.float32)
+    for b in range(batch_size):
+        for cls in range(cls_num):
+            shrink_seg = calc.thinout(seg_arr[b,:,:], seg_h, seg_w)
+            label[b,:,:,cls] = 1 * (shrink_seg == cls)
+    label_dict["seg_label"] = label
     feed_dict.update(network.create_feed_dict(input_image = img_arr,
                                               label_dict = label_dict,
                                               is_training = True))
@@ -80,7 +103,7 @@ def get_dtc_loss(network, weight_decay):
         loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
     return loss, [tf.exp(-cls_s), cls_loss, 0.5 * tf.exp(-reg_s), reg_loss]
 
-def get_segmentation_loss(network, weight_decay):
+def get_seg_loss(network, weight_decay):
     loss = tf.constant(0.0, dtype = tf.float32)
 
     seg_loss = tf.constant(0.0, dtype = tf.float32)
@@ -214,7 +237,7 @@ def focal_net(img_h,
                                      reg_ch // 4,
                                      4])
         network.add_identity(name = "reg{}".format(i + 2))
-    '''
+
     # segmentation
     concat_name_list = []
     for i in range(4):
@@ -224,7 +247,7 @@ def focal_net(img_h,
         concat_name_list.append("seg_ch{}".format(i + 2))
     network.add_concat(concat_name_list = concat_name_list)
     network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, name = "seg")
-    '''
+    
     # detection-loss
     for i in range(4):
         network.add_rect_loss(name = "loss{}".format(i + 2),
@@ -238,12 +261,12 @@ def focal_net(img_h,
                               reg_layer_name = "reg{}".format(i + 2),
                               cls_label_name = "cls_label{}".format(i + 2),
                               reg_label_name = "reg_label{}".format(i + 2))
-    ''' 
+    
     # segmentation-loss
     network.add_loss(loss_type = "cross_entropy",
-                     name = "seg",
+                     name = "seg_label",
                      gamma = 2.0)
-    '''
+    
     return network
 
 def evaluate(network, img_h, img_w, 
@@ -260,7 +283,7 @@ def evaluate(network, img_h, img_w,
                 for val_idx in tqdm(range(val_data.get_sample_num(val_type))):
                     # one image
                     img_arr, rect_labels, rects, _1, _2 = val_data.get_vertices_data(val_type, tgt_words_list, index = val_idx, flip = False)
-                    eval_feed_dict = make_feed_dict(network = network,
+                    eval_feed_dict = make_dtc_feed_dict(network = network,
                                                     img_arr = np.reshape(img_arr, [1] + list(img_arr.shape)),
                                                     rect_labels_list = [rect_labels],
                                                     rects_list = [rects],
@@ -332,6 +355,8 @@ def focal_trial():
                   resized_w = img_w)
     dtc_loss, dtc_loss_weight_vec = get_dtc_loss(network, weight_decay = 1E-4)
     dtc_opt = tf.train.AdamOptimizer(learning_rate = lr).minimize(dtc_loss)
+    seg_loss = get_seg_loss(network, weight_decay = 1E-4)
+    seg_opt = tf.train.AdamOptimizer(learning_rate = lr).minimize(seg_loss)
     
     train_type = "train"
     val_type = "val"
@@ -362,7 +387,7 @@ def focal_trial():
                     img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
-                    learn_feed_dict = make_feed_dict(network,
+                    learn_feed_dict = make_dtc_feed_dict(network,
                                                      1, #batch_size,
                                                      np.reshape(img_arr,     [1] + list(img_arr.shape)),
                                                      np.reshape(rect_labels, [1] + list(rect_labels.shape)),
@@ -403,7 +428,7 @@ def focal_trial():
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
                     if (rect_labels.size > 0) and (rects.size > 0):
-                        learn_feed_dict = make_feed_dict(network,
+                        learn_feed_dict = make_dtc_feed_dict(network,
                                                          1, #batch_size,
                                                          np.reshape(img_arr,     [1] + list(img_arr.shape)),
                                                          np.reshape(rect_labels, [1] + list(rect_labels.shape)),
@@ -474,20 +499,29 @@ def focal_trial():
                 rect_labels_list = []
                 rects_list = []
                 img_arr_list = np.empty((batch_size, img_h, img_w, img_ch)).astype(np.int)
-                for batch_cnt in range(batch_size):
-                    img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = None, flip = None)
-                    img_arr_list[batch_cnt] = img_arr
-                    rect_labels_list.append(rect_labels)
-                    rects_list.append(rects)
-                learn_feed_dict = make_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th)
-                learn_feed_dict[lr] = 1e-2
+                seg_arr_list = []
+                learn_feed_dict = {lr : 1e-2}
+                if b % 2 == 0:
+                    for batch_cnt in range(batch_size):
+                        img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = None, flip = None)
+                        img_arr_list[batch_cnt] = img_arr
+                        rect_labels_list.append(rect_labels)
+                        rects_list.append(rects)
+                    learn_feed_dict.update(make_dtc_feed_dict(network, batch_size, img_arr_list, rect_labels_list, rects_list, pos_th = pos_th, neg_th = neg_th))
+                    print(epoch, b, sess.run([dtc_opt, dtc_loss, dtc_loss_weight_vec], feed_dict = learn_feed_dict))
+                else:
+                    for batch_cnt in range(batch_size):
+                        img_arr, seg_arr = data.get_seg_data(train_type, tgt_words_list, index = None, flip = None)
+                        img_arr_list[batch_cnt] = img_arr
+                        seg_arr_list.append(seg_arr)
+                    learn_feed_dict.update(make_seg_feed_dict(network, batch_size, img_arr_list, np.array(seg_arr_list)))
+                    print(epoch, b, sess.run([seg_opt, seg_loss], feed_dict = learn_feed_dict))
                 
-                print(epoch, b, sess.run([dtc_opt, dtc_loss, dtc_loss_weight_vec], feed_dict = learn_feed_dict))
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
                     save_model(epoch, b)
                     start_time = time.time()
-                    
+                
                 dst_pred_dir = os.path.join(result_dir, "tmp_out")
                 if 1:
                     check = os.path.exists(dst_pred_dir)
