@@ -15,7 +15,11 @@ import time
 from PIL import Image, ImageDraw
 from datetime import datetime
 
-def make_feed_dict(network, batch_size, img_arr, rect_labels_list, rects_list, pos_th, neg_th):
+def make_feed_dict(network, batch_size,
+                   img_arr,             # batch x h x w x ch
+                   rect_labels_list,    # batch x label
+                   rects_list,          # batch x label x 4
+                   pos_th, neg_th):
     feed_dict = {}
     
     label_dict = {}
@@ -355,7 +359,12 @@ def focal_trial():
                     img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = i, flip = flip)
                     pil_img = Image.fromarray(img_arr.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_img)
-                    learn_feed_dict = make_feed_dict(network, batch_size, img_arr, rect_labels, rects, pos_th = pos_th, neg_th = neg_th)
+                    learn_feed_dict = make_feed_dict(network,
+                                                     1, #batch_size,
+                                                     np.reshape(img_arr,     [1] + list(img_arr.shape)),
+                                                     np.reshape(rect_labels, [1] + list(rect_labels.shape)),
+                                                     np.reshape(rects,       [1] + list(rects.shape)),
+                                                     pos_th = pos_th, neg_th = neg_th)
                     # visualize anchored label
                     for l in range(2, 5 + 1):
                         cls = sess.run(network._ImageNetwork__label_dict["cls_label{}".format(l)], feed_dict = learn_feed_dict)
