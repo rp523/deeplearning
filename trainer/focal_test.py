@@ -50,8 +50,8 @@ def make_dtc_feed_dict(network, batch_size,
     return feed_dict
 
 def make_seg_feed_dict(network, batch_size,
-                       img_arr,             # batch x h x w x ch
-                       seg_arr):           # batch x h x w
+                       img_arr,     # batch x img_h x img_w x ch
+                       seg_arr):    # batch x h x w
     feed_dict = {}
     
     label_dict = {}
@@ -116,7 +116,7 @@ def get_seg_loss(network, weight_decay):
     
     for weight in network.get_weight_list():
         loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
-    return loss
+    return loss, [seg_s]
 
 def focal_net(img_h,
               img_w,
@@ -246,7 +246,9 @@ def focal_net(img_h,
                              name = "seg_ch{}".format(i + 2))
         concat_name_list.append("seg_ch{}".format(i + 2))
     network.add_concat(concat_name_list = concat_name_list)
-    network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, name = "seg")
+    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256)
+    network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 1 + len(tgt_words_list))
+    network.add_softmax(name = "seg")
     
     # detection-loss
     for i in range(4):
@@ -344,7 +346,7 @@ def focal_trial():
                         anchor_offset_x = anchor_offset_x,
                         tgt_words_list = tgt_words_list)
     
-    batch_size = 16
+    batch_size = 8
     epoch_num = 30
     lr = tf.placeholder(dtype = tf.float32)
     pos_th = 0.5
@@ -355,7 +357,7 @@ def focal_trial():
                   resized_w = img_w)
     dtc_loss, dtc_loss_weight_vec = get_dtc_loss(network, weight_decay = 1E-4)
     dtc_opt = tf.train.AdamOptimizer(learning_rate = lr).minimize(dtc_loss)
-    seg_loss = get_seg_loss(network, weight_decay = 1E-4)
+    seg_loss, seg_loss_weight_vec = get_seg_loss(network, weight_decay = 1E-4)
     seg_opt = tf.train.AdamOptimizer(learning_rate = lr).minimize(seg_loss)
     
     train_type = "train"
@@ -515,7 +517,7 @@ def focal_trial():
                         img_arr_list[batch_cnt] = img_arr
                         seg_arr_list.append(seg_arr)
                     learn_feed_dict.update(make_seg_feed_dict(network, batch_size, img_arr_list, np.array(seg_arr_list)))
-                    print(epoch, b, sess.run([seg_opt, seg_loss], feed_dict = learn_feed_dict))
+                    print(epoch, b, sess.run([seg_opt, seg_loss, seg_loss_weight_vec], feed_dict = learn_feed_dict))
                 
                 if (time.time() - start_time >= log_interval_sec) or ((epoch == epoch_num - 1)and(b == data.get_sample_num(train_type) // batch_size - 1)):
                     # Save model
