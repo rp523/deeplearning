@@ -318,7 +318,9 @@ class ImageNetwork:
         label = tf.placeholder(dtype = tf.float32,
                                shape = [None] + list(pred_layer.get_shape())[1:])
         if loss_type == "cross_entropy":
-            loss = - tf.reduce_mean(label * tf.cast(tf.log(pred_layer + 1e-5), tf.float32))
+            p_t = (1.0 - pred_layer) + (2.0 * pred_layer - 1.0) * label
+            cls_loss_onehot = - ((1.0 - p_t) ** gamma) * tf.log(p_t + 1e-5)
+            loss = tf.reduce_mean(cls_loss_onehot)
         elif loss_type == "L1":
             loss = tf.reduce_mean(label - pred_layer)
         else:
