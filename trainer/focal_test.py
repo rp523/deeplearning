@@ -246,7 +246,7 @@ def focal_net(img_h,
                              name = "seg_ch{}".format(i + 2))
         concat_name_list.append("seg_ch{}".format(i + 2))
     network.add_concat(concat_name_list = concat_name_list)
-    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256)
+    network.add_conv_batchnorm_act(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, "relu")
     network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 1 + len(tgt_words_list))
     network.add_softmax(name = "seg")
     
