@@ -54,7 +54,7 @@ class EdgeAI(Dataset):
             "building"      : [  0, 203, 151],
             "vegetation"    : [ 85, 255,  50],
             "wall"          : [ 92, 136, 125],
-            "lane"          : [ 69,  47, 142],
+            "road"          : [ 69,  47, 142],  # definitionでは"lane"だが、普通の道路
             "ground"        : [136,  45,  66],
             "sidewalk"      : [  0, 255, 255],
             "road shoulder" : [215,   0, 255],
