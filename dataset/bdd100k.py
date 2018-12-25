@@ -158,7 +158,7 @@ class BDD100k(Dataset):
         rgb_arr = np.asarray(Image.open(rgb_path))
 
         if flip is None:
-            flip = np.random.randint(2).astype(np.bool)
+            flip = np.bool(np.random.randint(2))
         if flip is True:
             rgb_arr = rgb_arr[:,::-1,:]
             lbl_arr = lbl_arr[:,::-1]
@@ -169,7 +169,7 @@ class BDD100k(Dataset):
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
         if flip is None:
-            flip = np.random.randint(2).astype(np.bool)
+            flip = np.bool(np.random.randint(2))
         
         json_path = self.__json_path_dict[data_type][index]
 
@@ -360,8 +360,11 @@ def make_vertices_summary_img(data_type, tgt_labels):
             os.path.join(dst_dir, "{0:06d}_flip.png".format(i)))
         
 if __name__ == "__main__":
-    tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+    dtc_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
-    #make_vertices_summary_img("debug", tgt_words_list)
-    make_seg_summary_img("val", tgt_words_list)
+    seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+                      ["person", "rider"],
+                      ["road", "drivable area", "ground"]]
+    #make_vertices_summary_img("debug", dtc_words_list)
+    make_seg_summary_img("val", seg_words_list)
     print("Done.")

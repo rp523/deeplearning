@@ -125,7 +125,8 @@ def focal_net(img_h,
               anchor_asp,
               anchor_offset_y,
               anchor_offset_x,
-              tgt_words_list):
+              dtc_words_list,
+              seg_words_list):
     
     network = ImageNetwork(img_h, img_w, img_ch, random_seed = None)
     
@@ -188,7 +189,7 @@ def focal_net(img_h,
              anchor_asp.size * \
              anchor_offset_y.size * \
              anchor_offset_x.size * \
-             (1 + len(tgt_words_list))
+             (1 + len(dtc_words_list))
     reg_ch = anchor_size.size * \
              anchor_asp.size * \
              anchor_offset_y.size * \
@@ -223,8 +224,8 @@ def focal_net(img_h,
         network.add_reshape(shape = [-1,
                                      int(network.get_input(None).get_shape().as_list()[1]),
                                      int(network.get_input(None).get_shape().as_list()[2]),
-                                     cls_ch // (1 + len(tgt_words_list)),
-                                     1 + len(tgt_words_list)])
+                                     cls_ch // (1 + len(dtc_words_list)),
+                                     1 + len(dtc_words_list)])
         network.add_softmax(name = "cls{}".format(i + 2))
         # regression
         network.add_conv_batchnorm_act(filter_param = ImageNetwork.FilterParam(3, 3, 1, 1, True), weight = reg_weight_list[0], bias = reg_bias_list[0], activatioin_type = "relu", output_ch = 256, input_name = feature_layer_name)
@@ -247,7 +248,7 @@ def focal_net(img_h,
         concat_name_list.append("seg_ch{}".format(i + 2))
     network.add_concat(concat_name_list = concat_name_list)
     network.add_conv_batchnorm_act(ImageNetwork.FilterParam(1, 1, 1, 1, True), 256, "relu")
-    network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 1 + len(tgt_words_list))
+    network.add_conv(ImageNetwork.FilterParam(1, 1, 1, 1, True), 1 + (1 + len(seg_words_list)))
     network.add_softmax(name = "seg")
     
     # detection-loss
@@ -333,8 +334,11 @@ def focal_trial():
     img_w  = img_h * 2
     img_ch = 3
     
-    tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+    dtc_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
+    seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+                      ["person", "rider"],
+                      ["road", "drivable area", "ground"]]
     
     #from PIL import Image;Image.fromarray(rgb_arr_).show();exit()
     network = focal_net(img_h  = img_h,
@@ -344,7 +348,8 @@ def focal_trial():
                         anchor_asp = anchor_asp,
                         anchor_offset_y = anchor_offset_y,
                         anchor_offset_x = anchor_offset_x,
-                        tgt_words_list = tgt_words_list)
+                        dtc_words_list = dtc_words_list,
+                        seg_words_list = seg_words_list)
     
     batch_size = 8
     epoch_num = 30
@@ -505,7 +510,7 @@ def focal_trial():
                 learn_feed_dict = {lr : 1e-2}
                 if b % 2 == 0:
                     for batch_cnt in range(batch_size):
-                        img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, tgt_words_list, index = None, flip = None)
+                        img_arr, rect_labels, rects, _1, _2 = data.get_vertices_data(train_type, dtc_words_list, index = None, flip = None)
                         img_arr_list[batch_cnt] = img_arr
                         rect_labels_list.append(rect_labels)
                         rects_list.append(rects)
@@ -513,7 +518,7 @@ def focal_trial():
                     print(epoch, b, sess.run([dtc_opt, dtc_loss, dtc_loss_weight_vec], feed_dict = learn_feed_dict))
                 else:
                     for batch_cnt in range(batch_size):
-                        img_arr, seg_arr = data.get_seg_data(train_type, tgt_words_list, index = None, flip = None)
+                        img_arr, seg_arr = data.get_seg_data(train_type, dtc_words_list, index = None, flip = None)
                         img_arr_list[batch_cnt] = img_arr
                         seg_arr_list.append(seg_arr)
                     learn_feed_dict.update(make_seg_feed_dict(network, batch_size, img_arr_list, np.array(seg_arr_list)))
@@ -531,7 +536,7 @@ def focal_trial():
                         if os.path.isdir(dst_pred_dir):
                             if tmp_out is False:
                                 evaluate(network, img_h, img_w, anchor_size, anchor_asp, anchor_offset_y, anchor_offset_x, train_type,
-                                         data, tgt_words_list, dst_pred_dir,
+                                         data, dtc_words_list, dst_pred_dir,
                                          restore_path = save_model(epoch, b))
                                 tmp_out = True
                     else:

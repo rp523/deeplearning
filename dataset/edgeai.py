@@ -167,7 +167,7 @@ class EdgeAI(Dataset):
         if index is None:
             index = np.random.randint(len(self.__rgb_path_dict[data_type]))
         if flip is None:
-            flip = np.random.randint(2).astype(np.bool)
+            flip = np.bool(np.random.randint(2))
         
         rect_labels = np.empty(0).astype(np.int)
         rects = np.empty((0, 4)).astype(np.float)
@@ -403,10 +403,13 @@ def check_matching(json_dir_path, img_dir_path, ext = ".jpg"):
             print(img_path)
 
 def main():
-    tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+    dtc_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
-    #make_vertices_summary_img("train", tgt_words_list)
-    make_seg_summary_img("train", tgt_words_list)
+    seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
+                      ["person", "rider"],
+                      ["road", "drivable area", "ground"]]
+    #make_vertices_summary_img("train", dtc_words_list)
+    make_seg_summary_img("train", seg_words_list)
 if __name__ == "__main__":
     main()
     print("Done.")
