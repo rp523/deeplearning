@@ -166,7 +166,7 @@ class EdgeAI(Dataset):
         data_type = self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__rgb_path_dict[data_type]))
-        if index is None:
+        if flip is None:
             flip = np.random.randint(2).astype(np.bool)
         
         rect_labels = np.empty(0).astype(np.int)
@@ -236,6 +236,8 @@ class EdgeAI(Dataset):
         self.__update_seg_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__seg_rgb_path_dict[data_type]))
+        if flip is None:
+            flip = np.random.randint(2).astype(np.bool)
         lbl_path = self.__seg_lbl_path_dict[data_type][index]
         org_lbl_arr = np.asarray(Image.open(lbl_path))
         assert(org_lbl_arr.ndim == 3)
@@ -259,6 +261,10 @@ class EdgeAI(Dataset):
         rgb_path = self.__seg_rgb_path_dict[data_type][index]
         rgb_pil = Image.open(rgb_path).resize((self.__resized_w, self.__resized_h))
         rgb_arr = np.asarray(rgb_pil)
+        
+        if flip is True:
+            rgb_arr = rgb_arr[:,::-1,:]
+            lbl_arr = lbl_arr[:,::-1]
         return rgb_arr, lbl_arr
     
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
@@ -368,12 +374,14 @@ def make_seg_summary_img(data_type, tgt_words_list):
     dst_dir_path = os.path.join(storage.Storage().dataset_path(os.path.join("edgeai", "seg")), "seg_test")
 
     dst_dir = os.path.join(dst_dir_path, data_type)
+    print("writing " + dst_dir)
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
     for i in tqdm(range(e.get_seg_sample_num(data_type))):
-        rgb_arr, seg_arr = e.get_seg_data(data_type, tgt_words_list = tgt_words_list, index = i)
-        e.summary_seg_data(rgb_arr, seg_arr).save( \
-            os.path.join(dst_dir, "{0:06d}.png".format(i)))
+        for flip in [False, True]:
+            rgb_arr, seg_arr = e.get_seg_data(data_type, tgt_words_list = tgt_words_list, index = i, flip = flip)
+            e.summary_seg_data(rgb_arr, seg_arr).save( \
+                os.path.join(dst_dir, "{0:06d}".format(i) + "{}.png".format(flip)))
 
 def make_vertices_summary_img(data_type, tgt_labels):
     e = EdgeAI()
@@ -409,8 +417,8 @@ def check_matching(json_dir_path, img_dir_path, ext = ".jpg"):
 def main():
     tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
-    make_vertices_summary_img("train", tgt_words_list)
-    #make_seg_summary_img("train", tgt_words_list)
+    #make_vertices_summary_img("train", tgt_words_list)
+    make_seg_summary_img("train", tgt_words_list)
 if __name__ == "__main__":
     main()
     print("Done.")

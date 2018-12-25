@@ -179,7 +179,7 @@ class BDD100k(Dataset):
         data_type = self.__update_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__json_path_dict[data_type]))
-        if index is None:
+        if flip is None:
             flip = np.random.randint(2).astype(np.bool)
         
         json_path = self.__json_path_dict[data_type][index]
