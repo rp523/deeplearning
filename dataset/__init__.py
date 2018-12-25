@@ -130,6 +130,18 @@ class Dataset:
             dst_path = os.path.join(dst_dir_path, fio.get_file_name(img_path))[:-len(src_ext)] + ".npy"
             np.save(dst_path, np.asarray(Image.open(img_path)).astype(np.uint8))
 
+    def summary_seg_data(self, rgb_arr, lbl_arr):
+        alpha = 0.5
+        sum_arr = rgb_arr.copy()
+        for val in np.unique(lbl_arr).astype(np.int):
+            fill_idx = (val == lbl_arr)
+            if val != 0:
+                ave_col = alpha * rgb_arr[fill_idx] + (1.0 - alpha) * self.palette[val - 1]
+            else:
+                ave_col = alpha * rgb_arr[fill_idx]
+            sum_arr[fill_idx] = ave_col.astype(np.uint8)
+        return Image.fromarray(sum_arr)
+
 def main():
     for dat_type in ["train", "val", "test"]:
         src_dir_path = os.path.join(r"/media/isgsktyktt/EC-PHU3/bdd100k/images", dat_type)

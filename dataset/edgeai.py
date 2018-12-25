@@ -313,18 +313,6 @@ class EdgeAI(Dataset):
         #rgb_img.show()
         return rgb_img
         
-    def summary_seg_data(self, rgb_arr, lbl_arr):
-        alpha = 0.5
-        sum_arr = rgb_arr.copy()
-        for val in np.unique(lbl_arr).astype(np.int):
-            fill_idx = (val == lbl_arr)
-            if val != 0:
-                ave_col = alpha * sum_arr[fill_idx] + (1.0 - alpha) * self.palette[val - 1]
-            else:
-                ave_col = alpha * sum_arr[fill_idx]
-            sum_arr[fill_idx] = ave_col.astype(np.uint8)
-        return Image.fromarray(sum_arr)
-
     def list_new_category(self):
         data_type = "train"
         json_cat = []

@@ -139,42 +139,31 @@ class BDD100k(Dataset):
         self.__update_seg_list(data_type)
         return len(self.__seg_path_dict[data_type])
     
-    def get_seg_data(self, data_type, index = None):
+    def get_seg_data(self, data_type, tgt_words_list = None, index = None, flip = None):
         self.__update_seg_list(data_type)
         if index is None:
             index = np.random.randint(len(self.__seg_path_dict[data_type]))
         seg_path = self.__seg_path_dict[data_type][index]
         seg_arr = np.asarray(Image.open(seg_path))
-
+        
+        lbl_arr = np.zeros(seg_arr.shape).astype(np.uint8)
+        for i, tgt_words in enumerate(tgt_words_list):
+            for tgt_word in tgt_words:
+                if tgt_word in bdd_seg_dict.keys():
+                    tgt_seg_val = bdd_seg_dict[tgt_word]
+                    fill_idx = seg_arr == tgt_seg_val
+                    if fill_idx.any():
+                        lbl_arr[fill_idx] = i + 1
         rgb_path = self.__segimg_path_dict[data_type][index]
         rgb_arr = np.asarray(Image.open(rgb_path))
-        return rgb_arr, seg_arr
-    
-    def summary_seg_data(self, rgb_arr, seg_arr):
-        amp = 4
-        font_path = "arial.ttf"
-        font_size = 24
-        font = ImageFont.truetype(font_path, font_size)
-        
-        col = [0,0,255]
-        sum_arr = rgb_arr.copy().astype(np.int)
-        for v in [16]:
-            fill_arr = rgb_arr.copy().astype(np.int)
-            fill_arr[seg_arr == v] = col
-            sum_arr = ((amp - 1) * sum_arr + fill_arr) // amp
-        
-        sum_arr = sum_arr.astype(np.uint8)
-        sum_img = Image.fromarray(sum_arr)
-        draw = ImageDraw.Draw(sum_img, "RGB")
-        cnt = 0
-        for k, v in bdd_seg_dict.items():
-            draw.text([0, cnt],
-                       k,
-                       fill = tuple(col),
-                       font = font)
-            cnt += font_size
-        return sum_img
 
+        if flip is None:
+            flip = np.random.randint(2).astype(np.bool)
+        if flip is True:
+            rgb_arr = rgb_arr[:,::-1,:]
+            lbl_arr = lbl_arr[:,::-1]
+        return rgb_arr, lbl_arr
+    
     def get_vertices_data(self, data_type, tgt_words_list = None, index = None, flip = None):
         data_type = self.__update_list(data_type)
         if index is None:
@@ -336,7 +325,7 @@ class BDD100k(Dataset):
                                 out = out + line
                         line = fin.readline()
                         
-def make_seg_summary_img(data_type):
+def make_seg_summary_img(data_type, tgt_words_list):
     b = BDD100k()
     from tqdm import tqdm
     dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "seg_test")
@@ -346,9 +335,10 @@ def make_seg_summary_img(data_type):
         os.makedirs(dst_dir)
     print(dst_dir)
     for i in tqdm(range(b.get_seg_sample_num(data_type))):
-        rgb_arr, seg_arr = b.get_seg_data(data_type, i)
-        b.summary_seg_data(rgb_arr, seg_arr).save( \
-            os.path.join(dst_dir, "{0:06d}.png".format(i)))
+        for flip in [False, True]:
+            rgb_arr, seg_arr = b.get_seg_data(data_type = data_type, tgt_words_list = tgt_words_list, index = i, flip = flip)
+            b.summary_seg_data(rgb_arr, seg_arr).save( \
+                os.path.join(dst_dir, "{0:06d}".format(i) + "{}.png".format(flip)))
 
 def make_vertices_summary_img(data_type, tgt_labels):
     b = BDD100k()
@@ -372,5 +362,6 @@ def make_vertices_summary_img(data_type, tgt_labels):
 if __name__ == "__main__":
     tgt_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
-    make_vertices_summary_img("debug", tgt_words_list)
+    #make_vertices_summary_img("debug", tgt_words_list)
+    make_seg_summary_img("val", tgt_words_list)
     print("Done.")
