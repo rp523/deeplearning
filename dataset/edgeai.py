@@ -407,7 +407,7 @@ def main():
                       ["person", "rider"]]
     seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"],
-                      ["road", "drivable area", "ground"]]
+                      ["road", "drivable area"]]
     #make_vertices_summary_img("train", dtc_words_list)
     make_seg_summary_img("train", seg_words_list)
 if __name__ == "__main__":

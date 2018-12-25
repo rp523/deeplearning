@@ -364,7 +364,7 @@ if __name__ == "__main__":
                       ["person", "rider"]]
     seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"],
-                      ["road", "drivable area", "ground"]]
+                      ["road", "drivable area"]]
     #make_vertices_summary_img("debug", dtc_words_list)
     make_seg_summary_img("val", seg_words_list)
     print("Done.")
