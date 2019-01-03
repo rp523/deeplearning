@@ -96,8 +96,8 @@ def get_dtc_loss(network, weight_decay):
             reg_loss = reg_loss + v
     cls_s = tf.Variable(0.0, dtype = tf.float32)
     reg_s = tf.Variable(0.0, dtype = tf.float32)
-    loss = loss + (1.0 * tf.exp(- cls_s) * cls_loss + 0.5 * cls_s)
-    loss = loss + (0.5 * tf.exp(- reg_s) * reg_loss + 0.5 * reg_s)
+    loss = loss + (1.0 * tf.exp(-1 * cls_s) * cls_loss + 0.5 * cls_s)
+    loss = loss + (0.5 * tf.exp(-1 * reg_s) * reg_loss + 0.5 * reg_s)
     
     for weight in network.get_weight_list():
         loss = loss + tf.cast(weight_decay, tf.float32) * 0.5 * tf.reduce_sum(tf.cast(weight, tf.float32) ** 2)
@@ -500,7 +500,7 @@ def focal_trial():
             return dst_model_dir
         
         for epoch in range(epoch_num):
-            for b in tqdm(range(data.get_sample_num(train_type) // batch_size)):
+            for b in (range(data.get_sample_num(train_type) // batch_size)):
                 
                 # one image
                 rect_labels_list = []
