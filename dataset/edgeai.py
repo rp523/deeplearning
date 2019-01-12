@@ -237,7 +237,7 @@ class EdgeAI(Dataset):
         if index is None:
             index = np.random.randint(len(self.__seg_rgb_path_dict[data_type]))
         if flip is None:
-            flip = np.random.randint(2).astype(np.bool)
+            flip = np.bool(np.random.randint(2))
         lbl_path = self.__seg_lbl_path_dict[data_type][index]
         org_lbl_arr = np.asarray(Image.open(lbl_path))
         assert(org_lbl_arr.ndim == 3)

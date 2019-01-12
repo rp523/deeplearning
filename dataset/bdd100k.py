@@ -10,6 +10,7 @@ from common import fileio
 from dataset.__init__ import Dataset
 
 bdd_seg_dict = {}
+bdd_seg_dict["road"] = 0
 bdd_seg_dict["sidewalk"] = 1
 bdd_seg_dict["building"] = 2
 bdd_seg_dict["wall"] = 3
@@ -335,7 +336,7 @@ def make_seg_summary_img(data_type, tgt_words_list):
         os.makedirs(dst_dir)
     print(dst_dir)
     for i in tqdm(range(b.get_seg_sample_num(data_type))):
-        for flip in [False, True]:
+        for flip in [False]:
             rgb_arr, seg_arr = b.get_seg_data(data_type = data_type, tgt_words_list = tgt_words_list, index = i, flip = flip)
             b.summary_seg_data(rgb_arr, seg_arr).save( \
                 os.path.join(dst_dir, "{0:06d}".format(i) + "{}.png".format(flip)))
@@ -364,7 +365,7 @@ if __name__ == "__main__":
                       ["person", "rider"]]
     seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"],
-                      ["road", "drivable area"]]
+                      ["road"]]
     #make_vertices_summary_img("debug", dtc_words_list)
-    make_seg_summary_img("val", seg_words_list)
+    make_seg_summary_img("train", seg_words_list)
     print("Done.")
