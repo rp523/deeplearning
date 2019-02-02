@@ -19,10 +19,8 @@ def get_file_list(tgt_dir,
                   exclude_path_txt = None,
                   tgt_ext = None,
                   only_name = None,
-                  max_num = None,
                   recursive = True):
     # 着目しているディレクトリ以下のファイルを全取得する
-    ret = []
     for item_name in os.listdir(tgt_dir):
         item_path = os.path.join(tgt_dir, item_name)
         if os.path.isfile(item_path):
@@ -42,24 +40,19 @@ def get_file_list(tgt_dir,
             add = item_path
             if only_name is True:
                 add = get_file_name(add)
-            ret.append(add)
-            if max_num is not None:
-                if len(ret) >= max_num:
-                    return ret
+            yield add
         elif os.path.isdir(item_path):
             if recursive:
-                ret = get_file_list(tgt_dir = item_path,
-                                          name_txt = name_txt,
-                                          include_path_txt = include_path_txt,
-                                          exclude_path_txt = exclude_path_txt,
-                                          tgt_ext = tgt_ext,
-                                          only_name = only_name,
-                                          max_num = max_num,
-                                          recursive = recursive)
-    if not max_num is None:
-        if len(ret) > max_num:
-            ret = ret[:max_num]
-    return ret
+                for rec_item in get_file_list(tgt_dir = item_path,
+                                              name_txt = name_txt,
+                                              include_path_txt = include_path_txt,
+                                              exclude_path_txt = exclude_path_txt,
+                                              tgt_ext = tgt_ext,
+                                              only_name = only_name,
+                                              recursive = recursive):
+                    yield rec_item
 
 if __name__ == "__main__":
+    for i, item in enumerate(get_file_list("/media/isgsktyktt/EC-PHU3/apolloscape/road01_ins/ColorImage", tgt_ext = ".jpg")):
+        print(i, item)
     pass

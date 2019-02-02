@@ -28,6 +28,7 @@ class Dataset:
         self.label_dict["trailer"      ] = len(self.label_dict.keys()) + 1
         self.label_dict["train"        ] = len(self.label_dict.keys()) + 1
         self.label_dict["motorcycle"   ] = len(self.label_dict.keys()) + 1
+        self.label_dict["tricycle"      ] = len(self.label_dict.keys()) + 1
         self.label_dict["special"      ] = len(self.label_dict.keys()) + 1
         
         self.label_dict["building"     ] = len(self.label_dict.keys()) + 1
@@ -63,6 +64,9 @@ class Dataset:
         self.label_dict["ridergroup"   ] = self.label_dict["rider"  ] + 128
         self.label_dict["traingroup"   ] = self.label_dict["train"  ] + 128
         self.label_dict["polegroup"   ]  = self.label_dict["pole"   ] + 128
+        self.label_dict["motorcyclegroup"   ]  = self.label_dict["motorcycle"   ] + 128
+        self.label_dict["tricyclegroup"   ]  = self.label_dict["tricycle"   ] + 128
+
         #zeros
         self.label_dict["out of roi"          ] = 0
         self.label_dict["rectification border"] = 0
@@ -124,9 +128,7 @@ class Dataset:
         assert(os.path.isdir(src_dir_path))
         assert(os.path.exists(dst_dir_path))
         assert(os.path.isdir(dst_dir_path))
-        img_path_list = fio.get_file_list(src_dir_path, tgt_ext = src_ext)
-        for i in tqdm(range(len(img_path_list))):
-            img_path = img_path_list[i]
+        for img_path in fio.get_file_list(src_dir_path, tgt_ext = src_ext):
             dst_path = os.path.join(dst_dir_path, fio.get_file_name(img_path))[:-len(src_ext)] + ".npy"
             np.save(dst_path, np.asarray(Image.open(img_path)).astype(np.uint8))
 
