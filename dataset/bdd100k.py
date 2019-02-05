@@ -52,12 +52,16 @@ class BDD100k(Dataset):
         if not data_type in self.__seg_path_dict.keys():
             seg_dir_path = os.path.join(self.__data_path, "seg", "labels", data_type)
             if os.path.exists(seg_dir_path):
-                seg_path_list_ = fileio.get_file_list(tgt_dir = seg_dir_path,
-                                                     tgt_ext = ".png")
+                seg_path_list_ = []
+                for seg_path in fileio.get_file_list(tgt_dir = seg_dir_path,
+                                                     tgt_ext = ".png"):
+                    seg_path_list_.append(seg_path)
             segimg_dir_path = os.path.join(self.__data_path, "seg", "images", data_type)
             if os.path.exists(segimg_dir_path):
-                segimg_path_list_ = fileio.get_file_list(tgt_dir = segimg_dir_path,
-                                                        tgt_ext = ".jpg")
+                segimg_path_list_ = []
+                for segimg_path in fileio.get_file_list(tgt_dir = segimg_dir_path,
+                                                        tgt_ext = ".jpg"):
+                    segimg_path_list_.append(segimg_path)
             
             seg_key_list = []
             segimg_key_list = []
@@ -72,8 +76,7 @@ class BDD100k(Dataset):
             
             seg_path_list = []
             segimg_path_list = []
-            for s in range(len(seg_key_list)):
-                seg_key = seg_key_list[s]
+            for s, seg_key in enumerate(seg_key_list):
                 if seg_key in segimg_key_list:
                     seg_path_list.append(seg_path_list_[s])
                     segimg_path_list.append(segimg_path_list_[segimg_key_list.index(seg_key)])
@@ -96,13 +99,17 @@ class BDD100k(Dataset):
         if not data_type in self.__json_path_dict.keys():
             json_dir_path = os.path.join(self.__data_path, "labels", data_type)
             if os.path.exists(json_dir_path):
-                json_path_list_ = fileio.get_file_list(tgt_dir = json_dir_path,
-                                                       tgt_ext = ".json",
-                                                       max_num = max_num)
+                json_path_list_ = []
+                for json_path in fileio.get_file_list(tgt_dir = json_dir_path,
+                                                      tgt_ext = ".json",
+                                                      max_num = max_num):
+                    json_path_list_.append(json_path)
             rgb_dir_path = os.path.join(self.__data_path, "images", data_type)
             if os.path.exists(rgb_dir_path):
-                rgb_path_list_ = fileio.get_file_list(tgt_dir = rgb_dir_path,
-                                                      tgt_ext = ".jpg")
+                rgb_path_list_ = []
+                for rgb_path in fileio.get_file_list(tgt_dir = rgb_dir_path,
+                                                     tgt_ext = ".jpg"):
+                    rgb_path_list_.append(rgb_path)
             assert(len(json_path_list_) > 0)
             assert(len(rgb_path_list_) > 0)
 
@@ -366,6 +373,6 @@ if __name__ == "__main__":
     seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"],
                       ["road"]]
-    #make_vertices_summary_img("debug", dtc_words_list)
-    make_seg_summary_img("train", seg_words_list)
+    make_vertices_summary_img("train", dtc_words_list)
+    #make_seg_summary_img("train", seg_words_list)
     print("Done.")
