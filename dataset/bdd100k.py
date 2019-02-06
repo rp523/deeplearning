@@ -235,6 +235,39 @@ class BDD100k(Dataset):
         
         return rgb_arr, rect_labels, rects, poly_labels, polygons
     
+    def conv_vertices_to_drivable_edge(self, polygons, poly_labels, h_pix, w_pix):
+        fill_arr = np.zeros((h_pix, w_pix)).astype(np.uint8)
+        fill_pil = Image.fromarray(fill_arr)
+        draw = ImageDraw.Draw(fill_pil)
+        # いったん興味領域を白塗りする
+        for i, poly_label in enumerate(poly_labels):
+            if poly_label == self.label_dict["drivable area"]:
+                polygon_pix = polygons[i] * np.array([h_pix, w_pix])
+                polygon_pix = np.array(polygon_pix[:,::-1] + 0.5).astype(np.int)
+                draw.polygon(polygon_pix.flatten().tolist(), fill = 255)
+        fill_arr = np.asarray(fill_pil)
+        valid_row = np.any(fill_arr > 0, axis = 1)
+        tgt_arr = fill_arr[valid_row]
+        # 塗られた領域の左端、右端をエッジとする
+        left_edge_x  = -1 * np.ones(h_pix).astype(np.float)
+        right_edge_x = -1 * np.ones(h_pix).astype(np.float)
+        is_valid = (tgt_arr > 0)
+        if is_valid.any():
+            idx_cand = np.array(np.where(is_valid))
+            is_boundary_idx = (idx_cand[0][1:] - idx_cand[0][:-1] > 0)
+    
+            is_min_idx = np.append([True], is_boundary_idx)
+            left_edge_xpix_vec = idx_cand[1][is_min_idx]
+            left_edge_x[valid_row] = left_edge_xpix_vec / w_pix
+            
+            is_max_idx = np.append(is_boundary_idx, [True])
+            right_edge_xpix_vec = idx_cand[1][is_max_idx]
+            right_edge_x[valid_row] = right_edge_xpix_vec / w_pix
+
+        return np.append( left_edge_x.reshape(-1, 1),
+                         right_edge_x.reshape(-1, 1),
+                         axis = 1)
+        
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
         red   = (255,   0,   0, 128)
         blue  = (  0,   0, 255,  64)
@@ -277,6 +310,23 @@ class BDD100k(Dataset):
                     break
         #rgb_img.show()
         return rgb_img
+    
+    def summary_drivable_edge_data(self, rgb_arr, drivable_edge):
+        is_edge_exist_row = drivable_edge[:,0] >= 0
+        assert((is_edge_exist_row == (drivable_edge[:,1] >= 0)).all())
+        assert(drivable_edge.shape[0] == rgb_arr.shape[0])
+        draw_arr = rgb_arr.copy()
+        draw_pil = Image.fromarray(draw_arr.astype(np.uint8))
+        draw = ImageDraw.Draw(draw_pil)
+        for i in range(rgb_arr.shape[0] - 1):
+            y0 = i
+            y1 = i + 1
+            for j in range(2):
+                x0 = int(drivable_edge[i    ][j] * rgb_arr.shape[1])
+                x1 = int(drivable_edge[i + 1][j] * rgb_arr.shape[1])
+                if (x0 >= 0) and (x1 >= 0):
+                    draw.line(((x0, y0), (x1, y1)), fill = (255, 0, 0), width = 0)
+        return draw_pil
         
     def list_new_category(self):
         bdd_cat = []
@@ -367,12 +417,33 @@ def make_vertices_summary_img(data_type, tgt_labels):
         b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
             os.path.join(dst_dir, "{0:06d}_flip.png".format(i)))
         
+def make_drivablearea_summary_img(data_type):
+    b = BDD100k()
+    from tqdm import tqdm
+    dst_dir_path = os.path.join(storage.Storage().dataset_path("bdd100k"), "drivable_edge_test")
+    
+    dst_dir = os.path.join(dst_dir_path, data_type)
+    print("writing " + dst_dir)
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
+    for i in tqdm(range(b.get_sample_num(data_type))):
+        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = False)
+        drivable_edge = b.conv_vertices_to_drivable_edge(polygons, poly_labels, rgb_arr.shape[0], rgb_arr.shape[1])
+        b.summary_drivable_edge_data(rgb_arr, drivable_edge).save( \
+            os.path.join(dst_dir, "{0:06d}.png".format(i)))
+    for i in tqdm(range(b.get_sample_num(data_type))):
+        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = True)
+        b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
+            os.path.join(dst_dir, "{0:06d}_flip.png".format(i)))
+        
 if __name__ == "__main__":
     dtc_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"]]
     seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"],
                       ["road"]]
-    make_vertices_summary_img("train", dtc_words_list)
+    make_drivablearea_summary_img("debug")
+    #make_vertices_summary_img("train", dtc_words_list)
     #make_seg_summary_img("train", seg_words_list)
     print("Done.")
