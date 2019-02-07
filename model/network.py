@@ -312,7 +312,7 @@ class ImageNetwork:
     def get_weight_list(self):
         return self.__weight_list
 
-    def add_loss(self, loss_type, name, input_name = None, gamma = None):
+    def add_loss(self, loss_type, name, input_name = None, gamma = 1.0):
         pred_layer = self.get_input(input_name)
         # lossはすべてfloat32
         label = tf.placeholder(dtype = tf.float32,
