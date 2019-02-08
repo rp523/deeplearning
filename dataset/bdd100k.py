@@ -269,9 +269,15 @@ class BDD100k(Dataset):
                          right_edge_x.reshape(-1, 1),
                          axis = 1)
         
-    def get_drivable_edge_data(self, data_type, index = None, flip = None):
+    def get_drivable_edge_data(self, data_type, index = None, flip = None, h_pix = None, w_pix = None):
         rgb_arr, rect_labels, rects, poly_labels, polygons = self.get_vertices_data(data_type, index = index, flip = flip)
         drivable_edge = self.__conv_vertices_to_drivable_edge(polygons, poly_labels, rgb_arr.shape[0], rgb_arr.shape[1])
+        if (h_pix != None) and (w_pix != None):
+            rgb_arr = np.asarray(Image.fromarray(rgb_arr).resize((w_pix, h_pix)))
+            org_h = drivable_edge.shape[0]
+            assert(h_pix <= org_h)
+            mask = np.linspace(0, org_h - 1, h_pix).astype(np.int)
+            drivable_edge = drivable_edge[mask]
         return rgb_arr, drivable_edge
 
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
@@ -435,7 +441,7 @@ def make_drivablearea_summary_img(data_type):
 
     for flip in [False, True]:
         for i in tqdm(range(b.get_sample_num(data_type))):
-            rgb_arr, drivable_edge = b.get_drivable_edge_data(data_type, index = i, flip = flip)
+            rgb_arr, drivable_edge = b.get_drivable_edge_data(data_type, index = i, flip = flip, h_pix = 400, w_pix = 800)
             b.summary_drivable_edge_data(rgb_arr, drivable_edge).save( \
                 os.path.join(dst_dir, "{0:06d}".format(i) + "{}.png".format(flip)))
         
