@@ -263,7 +263,7 @@ class BDD100k(Dataset):
             
             is_max_idx = np.append(is_boundary_idx, [True])
             right_edge_xpix_vec = idx_cand[1][is_max_idx]
-            right_edge_x[valid_row] = right_edge_xpix_vec / w_pix
+            right_edge_x[valid_row] = 1.0 - right_edge_xpix_vec / w_pix
 
         return np.append( left_edge_x.reshape(-1, 1),
                          right_edge_x.reshape(-1, 1),
@@ -337,6 +337,9 @@ class BDD100k(Dataset):
                 x0 = int(drivable_edge[i    ][j] * rgb_arr.shape[1])
                 x1 = int(drivable_edge[i + 1][j] * rgb_arr.shape[1])
                 if (x0 >= 0) and (x1 >= 0):
+                    if j == 1:
+                        x0 = rgb_arr.shape[1] - 1 - x0
+                        x1 = rgb_arr.shape[1] - 1 - x1
                     draw.line(((x0, y0), (x1, y1)), fill = (255, 0, 0), width = 0)
         return draw_pil
         
