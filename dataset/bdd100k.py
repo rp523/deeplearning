@@ -1,10 +1,11 @@
 #coding:utf-8
-import sys, os
+import sys, os, subprocess
 import numpy as np
 import json
 from PIL import Image, ImageDraw, ImageFont
 
-sys.path.append("../")
+if __name__ == "__main__":
+    sys.path.append(subprocess.getoutput("pwd"))
 import storage
 from common import fileio
 from dataset.__init__ import Dataset
@@ -235,7 +236,7 @@ class BDD100k(Dataset):
         
         return rgb_arr, rect_labels, rects, poly_labels, polygons
     
-    def conv_vertices_to_drivable_edge(self, polygons, poly_labels, h_pix, w_pix):
+    def __conv_vertices_to_drivable_edge(self, polygons, poly_labels, h_pix, w_pix):
         fill_arr = np.zeros((h_pix, w_pix)).astype(np.uint8)
         fill_pil = Image.fromarray(fill_arr)
         draw = ImageDraw.Draw(fill_pil)
@@ -268,6 +269,11 @@ class BDD100k(Dataset):
                          right_edge_x.reshape(-1, 1),
                          axis = 1)
         
+    def get_drivable_edge_data(self, data_type, index = None, flip = None):
+        rgb_arr, rect_labels, rects, poly_labels, polygons = self.get_vertices_data(data_type, index = index, flip = flip)
+        drivable_edge = self.__conv_vertices_to_drivable_edge(polygons, poly_labels, rgb_arr.shape[0], rgb_arr.shape[1])
+        return rgb_arr, drivable_edge
+
     def summary_vertices_data(self, rgb_arr, rect_labels, rects, poly_labels, polygons):
         red   = (255,   0,   0, 128)
         blue  = (  0,   0, 255,  64)
@@ -427,15 +433,11 @@ def make_drivablearea_summary_img(data_type):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
 
-    for i in tqdm(range(b.get_sample_num(data_type))):
-        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = False)
-        drivable_edge = b.conv_vertices_to_drivable_edge(polygons, poly_labels, rgb_arr.shape[0], rgb_arr.shape[1])
-        b.summary_drivable_edge_data(rgb_arr, drivable_edge).save( \
-            os.path.join(dst_dir, "{0:06d}.png".format(i)))
-    for i in tqdm(range(b.get_sample_num(data_type))):
-        rgb_arr, rect_labels, rects, poly_labels, polygons = b.get_vertices_data(data_type, index = i, flip = True)
-        b.summary_vertices_data(rgb_arr, rect_labels, rects, poly_labels, polygons).save( \
-            os.path.join(dst_dir, "{0:06d}_flip.png".format(i)))
+    for flip in [False, True]:
+        for i in tqdm(range(b.get_sample_num(data_type))):
+            rgb_arr, drivable_edge = b.get_drivable_edge_data(data_type, index = i, flip = flip)
+            b.summary_drivable_edge_data(rgb_arr, drivable_edge).save( \
+                os.path.join(dst_dir, "{0:06d}".format(i) + "{}.png".format(flip)))
         
 if __name__ == "__main__":
     dtc_words_list = [["car", "truck", "bus", "trailer", "caravan"],
