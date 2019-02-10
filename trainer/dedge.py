@@ -39,7 +39,7 @@ def main():
     w_pix = 256
     epoch_num = 10
     batch_size = 1
-    lr = 1E-3
+    lr = 1E-2
     network = dedge_net(img_h = h_pix,
                         img_w = w_pix,
                         img_ch = 3,
@@ -71,7 +71,7 @@ def main():
 
                 valid_row = (drivable_edge[:,0] > 0.0)
                 for ch in range(3):
-                    lbl_batch[b, :, 0, ch] = valid_row
+                    val_batch[b, :, 0, ch] = valid_row
 
                 lbl_batch[b, :, 0, 0] = drivable_edge[:,0]
                 lbl_batch[b, :, 0, 2] = drivable_edge[:,1]
