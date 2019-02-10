@@ -49,6 +49,7 @@ def dedge_main():
     opt  = tf.train.AdamOptimizer(learning_rate = lr).minimize(loss)
     bdd = BDD100k()
     train_type = "debug"
+    val_type = "debug"
     restore_path = None
     result_dir = "result_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     model_path = os.path.join(result_dir, "learned_model")
@@ -62,6 +63,16 @@ def dedge_main():
                 saver.restore(sess, ckpt.model_checkpoint_path)
         else:
             sess.run(tf.global_variables_initializer())
+        
+        # only evaluation
+        for i in tqdm(range(bdd.get_sample_num(val_type))):
+            rgb_arr, drivable_edge = bdd.get_drivable_edge_data(data_type = val_type, index = i, h_pix = h_pix, w_pix = w_pix)
+            feed_dict = network.create_feed_dict(input_image = np.reshape(rgb_arr, [-1, list(rgb_arr.shape])),
+                                                 is_training = False)
+            output = sess.run(network.get_layer("output"), feed_dict = feed_dict))
+            output = output[0, :, 0, [0, 2]]
+            bdd.summary_drivable_edge_data(rgb_arr, output).save(os.path.join(result_dir, "val", val_type + "_{}.png".format(i)))
+
         for epoch in range(epoch_num):
             for i in tqdm(range(bdd.get_sample_num(train_type) // batch_size)):
                 # make batched-dataset
