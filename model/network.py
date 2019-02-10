@@ -469,7 +469,7 @@ class ImageNetwork:
         feed_dict[self.__is_training] = is_training
         return feed_dict
     
-    def save_model(self, sess, saver, dst_dir_path, epoch = None, b = None, log_interval_sec = 1):#30 * 60):
+    def save_model(self, sess, saver, dst_dir_path, epoch = None, b = None, log_interval_sec = 30 * 60):
         exec_save = False
         if self.__saved_time == None:
             # 初めて
