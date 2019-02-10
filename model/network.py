@@ -3,6 +3,7 @@ import os, sys, shutil
 import numpy as np
 import tensorflow as tf
 from transformer import *
+import time
 
 class ImageNetwork:
     def __init__(self, image_h, image_w, image_ch,
@@ -48,6 +49,7 @@ class ImageNetwork:
                                        name = "input_image")
         self.__layer_list = [src_img_layer]
         self.__is_training = tf.placeholder(dtype = tf.bool)
+        self.__saved_time = None
         
     def __get_padding_str(self, padding):
         assert(isinstance(padding, bool))
@@ -467,6 +469,29 @@ class ImageNetwork:
         feed_dict[self.__is_training] = is_training
         return feed_dict
     
+    def save_model(self, sess, saver, dst_dir_path, epoch = None, b = None, log_interval_sec = 1):#30 * 60):
+        exec_save = False
+        if self.__saved_time == None:
+            # 初めて
+            exec_save = True
+        else:
+            # ２回め以降だが、十分時間経過した
+            if time.time() - self.__saved_time >= log_interval_sec:
+                exec_save = True
+        
+        if exec_save:
+            self.__saved_time = time.time()
+            dst_name = "model"
+            if epoch != None:
+                dst_name = dst_name + "epoch{0:04d}".format(epoch)                
+            if b != None:
+                dst_name = dst_name + "_batch{}".format(b)
+            dst_model_dir = os.path.join(dst_dir_path, dst_name)
+            if not os.path.exists(dst_model_dir):
+                os.makedirs(dst_model_dir)
+            dst_model_path = os.path.join(dst_model_dir, "model.ckpt")
+            saver.save(sess, dst_model_path)
+
     # to be deleted
     def fit(self, train_x, train_y, valid_x, valid_y, loss_type, optimizer_type, learning_rate, epoch_num, batch_size, log_interval = 1):
         assert(train_x.shape[1:] == valid_x.shape[1:])

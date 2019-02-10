@@ -1,6 +1,6 @@
 #coding: utf-8
 import sys, os
-from trainer.focal_test import focal_trial
+from trainer.dedge import dedge_main
 if __name__ == "__main__":
-    focal_trial()
+    dedge_main()
     print("Done.")
