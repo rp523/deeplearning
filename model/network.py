@@ -312,23 +312,31 @@ class ImageNetwork:
     def get_weight_list(self):
         return self.__weight_list
 
-    def add_loss(self, loss_type, name, input_name = None, gamma = 1.0):
+    def add_loss(self, loss_type, name, input_name = None, gamma = 1.0, masking = False):
         pred_layer = self.get_input(input_name)
         # lossはすべてfloat32
         label = tf.placeholder(dtype = tf.float32,
                                shape = [None] + list(pred_layer.get_shape())[1:])
+        if masking:
+            mask = tf.placeholder(dtype = tf.bool,
+                                  shape = [None] + list(pred_layer.get_shape())[1:])
         if loss_type == "cross_entropy":
             p_t = (1.0 - pred_layer) + (2.0 * pred_layer - 1.0) * label
-            cls_loss_onehot = - ((1.0 - p_t) ** gamma) * tf.log(p_t + 1e-5)
-            loss = tf.reduce_mean(cls_loss_onehot)
+            loss_vec = - ((1.0 - p_t) ** gamma) * tf.log(p_t + 1e-5)
         elif loss_type == "L1":
-            loss = tf.reduce_mean(label - pred_layer)
+            loss_vec = label - pred_layer
         else:
             assert(0)
+        if mask != None:
+            loss_vec = tf.boolean_mask(loss_vec, mask)
+        loss = tf.reduce_mean(loss_vec)
         assert(not name in self.__loss_dict.keys())
-        assert(not name in self.__label_dict.keys())
         self.__loss_dict[name]  = loss
+        assert(not name in self.__label_dict.keys())
         self.__label_dict[name] = label
+        if masking:
+            assert(not name + "_mask" in self.__label_dict.keys())
+            self.__label_dict[name + "_mask"] = mask
 
     def make_quantize(self, N, input_layer):
         sign = tf.sign(input_layer)
