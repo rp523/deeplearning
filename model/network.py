@@ -327,7 +327,7 @@ class ImageNetwork:
             loss_vec = label - pred_layer
         else:
             assert(0)
-        if mask != None:
+        if masking:
             loss_vec = tf.boolean_mask(loss_vec, mask)
         loss = tf.reduce_mean(loss_vec)
         assert(not name in self.__loss_dict.keys())
