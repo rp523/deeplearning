@@ -454,7 +454,7 @@ if __name__ == "__main__":
     seg_words_list = [["car", "truck", "bus", "trailer", "caravan"],
                       ["person", "rider"],
                       ["road"]]
-    make_drivablearea_summary_img("debug")
+    make_drivablearea_summary_img("train")
     #make_vertices_summary_img("train", dtc_words_list)
     #make_seg_summary_img("train", seg_words_list)
     print("Done.")
