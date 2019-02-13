@@ -277,6 +277,12 @@ class ImageNetwork:
         new_layer = tf.nn.softmax(logits = input_layer,
                                   name = name)
         self.add_layer(new_layer)
+   
+    def add_sigmoid(self, name = None, input_name = None):
+        input_layer = self.get_input(input_name)
+        new_layer = tf.sigmoid(x = input_layer,
+                               name = name)
+        self.add_layer(new_layer)
     
     def add_branching(self, name, input_name = None):
         input_layer = self.get_input(input_name)
@@ -325,8 +331,12 @@ class ImageNetwork:
         if loss_type == "cross_entropy":
             p_t = (1.0 - pred_layer) + (2.0 * pred_layer - 1.0) * label
             loss_vec = - ((1.0 - p_t) ** gamma) * tf.log(p_t + 1e-5)
+        elif loss_type == "symmetric_cross_entropy":
+            loss_vec = - 0.5 * (pred_layer * tf.log(label + 1e-5) + label * tf.log(pred_layer + 1e-5))
         elif loss_type == "L1":
-            loss_vec = label - pred_layer
+            loss_vec = tf.abs(label - pred_layer)
+        elif loss_type == "squared":
+            loss_vec = 0.5 * (label - pred_layer) * (label - pred_layer)
         else:
             assert(0)
         if masking:
