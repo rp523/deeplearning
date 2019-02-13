@@ -323,7 +323,7 @@ class BDD100k(Dataset):
         #rgb_img.show()
         return rgb_img
     
-    def summary_drivable_edge_data(self, rgb_arr, drivable_edge):
+    def summary_drivable_edge_data(self, rgb_arr, drivable_edge, valid_range = None):
         is_edge_exist_row = drivable_edge[:,0] >= 0
         assert((is_edge_exist_row == (drivable_edge[:,1] >= 0)).all())
         assert(drivable_edge.shape[0] == rgb_arr.shape[0])
@@ -333,6 +333,9 @@ class BDD100k(Dataset):
         for i in range(rgb_arr.shape[0] - 1):
             y0 = i
             y1 = i + 1
+            if valid_range != None:
+                if (y0 < valid_range[0]) or (y1 > valid_range[1]):
+                    continue
             for j in range(2):
                 x0 = int(drivable_edge[i    ][j] * rgb_arr.shape[1])
                 x1 = int(drivable_edge[i + 1][j] * rgb_arr.shape[1])
