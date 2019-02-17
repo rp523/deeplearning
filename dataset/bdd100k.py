@@ -323,19 +323,20 @@ class BDD100k(Dataset):
         #rgb_img.show()
         return rgb_img
     
-    def summary_drivable_edge_data(self, rgb_arr, drivable_edge, valid_range = None):
+    def summary_drivable_edge_data(self, rgb_arr, drivable_edge, valid_range_start = None, valid_range_end = None):
         is_edge_exist_row = drivable_edge[:,0] >= 0
         assert((is_edge_exist_row == (drivable_edge[:,1] >= 0)).all())
         assert(drivable_edge.shape[0] == rgb_arr.shape[0])
         draw_arr = rgb_arr.copy()
         draw_pil = Image.fromarray(draw_arr.astype(np.uint8))
         draw = ImageDraw.Draw(draw_pil)
+        col = (255, 0, 0)
         for i in range(rgb_arr.shape[0] - 1):
             y0 = i
             y1 = i + 1
-            if valid_range != None:
-                if (y0 < valid_range[0]) or (y1 > valid_range[1]):
-                    continue
+            if (valid_range_start != None) and (valid_range_end != None):
+                if (y0 < valid_range_start) or (y1 > valid_range_end):
+                    col = (0, 0, 0,)
             for j in range(2):
                 x0 = int(drivable_edge[i    ][j] * rgb_arr.shape[1])
                 x1 = int(drivable_edge[i + 1][j] * rgb_arr.shape[1])
@@ -343,7 +344,7 @@ class BDD100k(Dataset):
                     if j == 1:
                         x0 = rgb_arr.shape[1] - 1 - x0
                         x1 = rgb_arr.shape[1] - 1 - x1
-                    draw.line(((x0, y0), (x1, y1)), fill = (255, 0, 0), width = 0)
+                    draw.line(((x0, y0), (x1, y1)), fill = col, width = 0)
         return draw_pil
         
     def list_new_category(self):
