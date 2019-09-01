@@ -11,7 +11,7 @@ class Storage:
             self.__location = "notebook"
         elif (pcname == "floydhub") or (pcname == "job-instance"):
             self.__location = "floydhub"
-        elif pcname == "Yusuke-PC":
+        elif pcname == "isgsktyktt-Diginnos-PC":
             self.__location = "desktop"
         elif pcname == "auto3tes123":
             self.__location = "auto3tes123"
@@ -28,13 +28,16 @@ class Storage:
         elif self.__location == "floydhub":
             base_path = "/floyd/input"
         elif self.__location == "desktop":
-            base_path = r"G:\dataset"
+            base_path = r"/hdd/dataset"
         elif self.__location == "auto3tes123":
             base_path = r"/gpfs/auto3tes123/dataset"
         else:
             assert(0)
         dataset_path = os.path.join(base_path, dataset_name)
-        assert(os.path.exists(dataset_path))
+
+        if not (os.path.exists(dataset_path)):
+            print(dataset_path)
+            assert(os.path.exists(dataset_path))
         return dataset_path
     
 if __name__ == "__main__":

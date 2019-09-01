@@ -1,93 +1,100 @@
 #coding: utf-8
 import os, sys
 import numpy as np
-from tqdm import tqdm
-import tensorflow as tf
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 sys.path.append("../")
 from dataset.mnist import MNIST
-from model.network import ImageNetwork
-from transformer import *
-from trainer import Trainer
+import time 
 
-def mnist_trial():
-    
-    mnist = MNIST()
-    N = 7
-    network = ImageNetwork(image_h = 28,
-                           image_w = 28,
-                           image_ch = 1,
-                           input_dtype = tf.float32,
-                           dtype = tf.float32)
-    for i, filter_param in enumerate([ImageNetwork.FilterParam(3, 3, 1, 1, True),
-                                      ImageNetwork.FilterParam(3, 3, 2, 2, True),
-                                      ImageNetwork.FilterParam(3, 3, 2, 2, True)]):
-        output_ch = 2 ** (i + 4)
-        input_ch = network.get_input(None).get_shape().as_list()[3]
-        weight = network.make_conv_weight(filter_param, input_ch = input_ch, output_ch = output_ch)
-        bias   = network.make_conv_bias(output_ch = output_ch)
-        conv = network.make_conv(filter_param, output_ch, weight = weight, bias = bias)
-        q_conv = network.make_quantize(N, conv)
-        network.add_switch(conv, q_conv)
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(1, 6, 3)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 3)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+        self.sm = nn.Softmax(dim = 1)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, 16 * 5 * 5)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        x = self.sm(x)
+        return x
         
-        #network.add_batchnorm()
-        network.add_groupnorm(group_div = 16)
-        network.add_activation("relu")
-        layer = network.get_input(None)
-        q_layer = network.make_quantize(N, layer)
-        network.add_switch(layer, q_layer)
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
     
-    network.add_full_connect(1024)
-    layer = network.get_input(None)
-    q_layer = network.make_quantize(N, layer)
-    network.add_switch(layer, q_layer)
-
-    network.add_activation("relu")
-    layer = network.get_input(None)
-    q_layer = network.make_quantize(N, layer)
-    network.add_switch(layer, q_layer)
-
-    network.add_dropout(0.5)
+    def flatten(self, x):
+        return x.view(-1, self.num_flat_features(x))
     
-    network.add_full_connect(10)
-    layer = network.get_input(None)
-    q_layer = network.make_quantize(N, layer)
-    network.add_switch(layer, q_layer)
     
-    network.add_softmax("answer")
-    network.add_loss("cross_entropy", name = "ce_loss")
-    #network.show()
-    
-    total_loss = tf.constant(0.0)
-    for loss in network.get_loss_dict().values():
-        total_loss += loss
-    batch_size = 8
-    epoch_num = 100
-    lr = 1e-4
+def train():
+    device = torch.device("cuda:0")
+    net = Net().to(device)
+    mnist = MNIST()
     x, y = mnist.get_data("train")
-    y = transform_one_hot(y, 10)
     xv, yv = mnist.get_data("val")
-    yv = transform_one_hot(yv, 10)
-    optimizer = tf.train.AdamOptimizer(lr).minimize(total_loss)
+    x  = np.transpose(x , (0, 3, 1, 2)) / 128 - 1
+    xv = np.transpose(xv, (0, 3, 1, 2)) / 128 - 1
+    x  = torch.from_numpy( x.astype(np.float32)).to(device)
+    xv = torch.from_numpy(xv.astype(np.float32)).to(device)
+    y  = torch.from_numpy( y.astype(np.int64)).to(device)
+    yv = torch.from_numpy(yv.astype(np.int64)).to(device)
     
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        for epoch in range(epoch_num):
-            batch_cnt = 0
-            for b in (range(x.shape[0] // batch_size)):
-                batch_cnt += batch_size
-                batch_idx = np.random.choice(np.arange(x.shape[0]), batch_size, replace = True)
-                learn_feed_dict = network.create_feed_dict(input_image = x[batch_idx] / 128 - 0.5, is_training = True, label_dict = {"ce_loss": y[batch_idx]})
-                sess.run(optimizer, feed_dict = learn_feed_dict)
-                if b % 10 == 0:
-                    eval_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = False, label_dict = {"ce_loss": yv})
-                    eval_ans_mat = sess.run(network.get_layer("answer"), feed_dict = eval_feed_dict)
-                    eval_acc = np.average(np.argmax(eval_ans_mat, axis = 1) == np.argmax(yv, axis = 1))
-                    learn_feed_dict = network.create_feed_dict(input_image = xv / 128 - 0.5, is_training = True, label_dict = {"ce_loss": yv})
-                    learn_ans_mat = sess.run(network.get_layer("answer"), feed_dict = learn_feed_dict)
-                    learn_acc = np.average(np.argmax(learn_ans_mat, axis = 1) == np.argmax(yv, axis = 1))
-                    print("[epoch={e}/{et}][batch={b}/{bt}] acc={lacc},{eacc}".format(e = epoch, et = epoch_num, b = batch_cnt, bt = x.shape[0],
-                                                                              lacc = learn_acc,
-                                                                              eacc = eval_acc))
+    EPOCH_NUM = 501
+    BATCH_SIZE = 16
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(net.parameters(),
+                          lr = 0.001,
+                          momentum = 0.9,
+                          weight_decay = 5e-5)
+    running_loss = 0.0
+    
+    for epoch in range(EPOCH_NUM):
+        t0 = time.time()
+        running_loss = 0.
+        for i, batch_try in enumerate(range(x.shape[0] // BATCH_SIZE)):
+            batch_idx = np.random.choice(np.arange(x.shape[0]), BATCH_SIZE, replace = True)
+            batch_x = x[batch_idx]
+            batch_y = y[batch_idx]
+            
+            # zero the parameter gradients
+            optimizer.zero_grad()
+    
+            # forward + backward + optimize
+            outputs = net.forward(batch_x)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+    
+            running_loss += loss.item()
+        # print statistics
+        t1 = time.time()
+        
+        with torch.no_grad():
+            outputs = net.forward(xv)
+            max_val, max_idx = outputs.max(1)
+            correct = torch.eq(max_idx, yv).float().mean().cpu()
+            correct = float(correct)
+            print('[%.3f, %d, %5d] loss: %.3f acc: %.3f' %
+                  ((t1 - t0), epoch + 1, i + 1, running_loss / 2000, correct * 100.0))
+            
+def main():
+    train()
 
 if "__main__" == __name__:
-    mnist_trial()
+    main()
+    print("Done.")

@@ -15,13 +15,13 @@ class MNIST:
         data_path = s.dataset_path("mnist")
         assert(os.path.exists(data_path))
 
-        with open(os.path.join(data_path, "train-images.idx3-ubyte"), "rb") as f:
+        with open(os.path.join(data_path, "train-images-idx3-ubyte"), "rb") as f:
             self.__train_images = np.array(list(f.read())[16:]).astype(np.uint8).reshape(-1, 28, 28, 1)
-        with open(os.path.join(data_path, "t10k-images.idx3-ubyte"), "rb") as f:
+        with open(os.path.join(data_path, "t10k-images-idx3-ubyte"), "rb") as f:
             self.__valid_images = np.array(list(f.read())[16:]).astype(np.uint8).reshape(-1, 28, 28, 1)
-        with open(os.path.join(data_path, "train-labels.idx1-ubyte"), "rb") as f:
+        with open(os.path.join(data_path, "train-labels-idx1-ubyte"), "rb") as f:
             self.__train_labels = np.array(list(f.read())[8:]).astype(np.uint8).flatten()
-        with open(os.path.join(data_path, "t10k-labels.idx1-ubyte"), "rb") as f:
+        with open(os.path.join(data_path, "t10k-labels-idx1-ubyte"), "rb") as f:
             self.__valid_labels = np.array(list(f.read())[8:]).astype(np.uint8).flatten()
         
         if one_hot is True:
